@@ -1,0 +1,876 @@
+// Jimma ICS Backend — Prisma Schema
+// Phase 1: core/shared tables only (auth, RBAC, locations, translations,
+// documents, audit log). Feature modules (Zakat, Janazah, Mosques,
+// Waqf, Announcements, Events, etc.) are added in later phases.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth & RBAC
+// ---------------------------------------------------------------------------
+
+model User {
+  id           Int       @id @default(autoincrement())
+  fullName     String    @map("full_name")
+  email        String    @unique
+  phone        String?   @unique
+  passwordHash String    @map("password_hash")
+  isActive     Boolean   @default(true) @map("is_active")
+  roleId       Int       @map("role_id")
+  role         Role      @relation(fields: [roleId], references: [id])
+  lastLoginAt  DateTime? @map("last_login_at")
+  metadata     Json?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  refreshTokens  RefreshToken[]
+  passwordResets PasswordResetToken[]
+  auditLogs      AuditLog[]           @relation("ActorAuditLogs")
+  documents      Document[]
+
+  zakatAssignments   ZakatApplication[]  @relation("ZakatAssignedOfficer")
+  zakatAssessments   ZakatAssessment[]
+  zakatDistributions ZakatDistribution[]
+  janazahAssignments JanazahRequest[]    @relation("JanazahAssignedOfficer")
+
+  @@index([roleId])
+  @@map("users")
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       Int @map("role_id")
+  permissionId Int @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model RefreshToken {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdByIp String?   @map("created_by_ip")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Shared reference / cross-cutting tables
+// ---------------------------------------------------------------------------
+
+model Woreda {
+  id                Int      @id @default(autoincrement())
+  code              String   @unique // e.g. "agaro", "kersa", "limmu-kosa"
+  isActive          Boolean  @default(true) @map("is_active")
+  oromoName         String?  @map("oromo_name") @db.VarChar(180)
+  arabicName        String?  @map("arabic_name") @db.VarChar(180)
+  zone              String?  @db.VarChar(120)
+  climateZone       String?  @map("climate_zone") @db.VarChar(40)
+  centerLatitude    Float?   @map("center_latitude")
+  centerLongitude   Float?   @map("center_longitude")
+  svgPath           String?  @map("svg_path") @db.Text
+  labelX            Float?   @map("label_x")
+  labelY            Float?   @map("label_y")
+  areaKm2           Float?   @map("area_km2")
+  elevationMeters   Int?     @map("elevation_meters")
+  population        Int?
+  muslimPercentage  Float?   @map("muslim_percentage")
+  councilBranchHead String?  @map("council_branch_head") @db.VarChar(180)
+  headContact       String?  @map("head_contact") @db.VarChar(40)
+  notableFeatures   Json?    @map("notable_features")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  mosques  Mosque[]
+  madrasas Madrasa[]
+
+  zakatApplications ZakatApplication[]
+  janazahRequests   JanazahRequest[]
+  cemeteryPlots     CemeteryPlot[]
+  waqfAssets        WaqfAsset[]
+
+  @@map("woredas")
+}
+
+model CouncilEvent {
+  id               Int                 @id @default(autoincrement())
+  title            String              @db.VarChar(240)
+  arabicTitle      String?             @map("arabic_title") @db.VarChar(240)
+  category         String              @db.VarChar(80)
+  date             DateTime            @db.Date
+  hijriDate        String              @map("hijri_date") @db.VarChar(100)
+  time             String              @db.VarChar(100)
+  location         String              @db.VarChar(240)
+  venueDetails     String?             @map("venue_details") @db.VarChar(500)
+  district         String              @db.VarChar(150)
+  organizer        String              @db.VarChar(200)
+  speaker          String              @db.VarChar(200)
+  description      String              @db.Text
+  maxCapacity      Int                 @map("max_capacity")
+  registeredSeats  Int                 @default(0) @map("registered_seats")
+  isFeatured       Boolean             @default(false) @map("is_featured")
+  image            String              @db.VarChar(1000)
+  registrationOpen Boolean             @default(true) @map("registration_open")
+  status           String              @default("Upcoming") @db.VarChar(30)
+  format           String?             @db.VarChar(30)
+  entryFee         String?             @map("entry_fee") @db.VarChar(100)
+  isPaid           Boolean             @default(false) @map("is_paid")
+  feeAmount        Decimal             @default(0) @map("fee_amount") @db.Decimal(12, 2)
+  paymentInstructions String?          @map("payment_instructions") @db.Text
+  targetAudience   String?             @map("target_audience") @db.VarChar(500)
+  livestreamUrl    String?             @map("livestream_url") @db.VarChar(1000)
+  contactPhone     String?             @map("contact_phone") @db.VarChar(30)
+  contactEmail     String?             @map("contact_email") @db.VarChar(255)
+  schedule         Json?
+  speakersList     Json?               @map("speakers_list")
+  tags             Json?
+  materials        Json?
+  isPublished      Boolean             @default(true) @map("is_published")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  registrations    EventRegistration[]
+
+  @@index([date, status])
+  @@index([isPublished, date])
+  @@index([category, district])
+  @@map("council_events")
+}
+
+model Announcement {
+  id             Int      @id @default(autoincrement())
+  title          String   @db.VarChar(240)
+  category       String   @db.VarChar(80)
+  publishDate    DateTime @map("publish_date") @db.Date
+  hijriDate      String   @default("") @map("hijri_date") @db.VarChar(100)
+  author         String   @db.VarChar(200)
+  summary        String   @db.Text
+  content        String   @db.LongText
+  isPinned       Boolean  @default(false) @map("is_pinned")
+  isUrgent       Boolean  @default(false) @map("is_urgent")
+  priority       String   @default("Normal") @db.VarChar(20)
+  district       String?  @db.VarChar(150)
+  targetAudience String?  @map("target_audience") @db.VarChar(200)
+  readTime       String   @default("1 min read") @map("read_time") @db.VarChar(30)
+  isPublished    Boolean  @default(true) @map("is_published")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([isPublished, isPinned, publishDate])
+  @@index([category, publishDate])
+  @@map("announcements")
+}
+
+enum EventRegistrationStatus {
+  CONFIRMED
+  CHECKED_IN
+  CANCELLED
+}
+
+enum EventPaymentStatus {
+  FREE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model EventRegistration {
+  id                    Int                     @id @default(autoincrement())
+  eventId               Int                     @map("event_id")
+  event                 CouncilEvent            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  fullName              String                  @map("full_name") @db.VarChar(180)
+  phone                 String                  @db.VarChar(30)
+  email                 String?                 @db.VarChar(255)
+  district              String                  @db.VarChar(150)
+  organizationOrMadrasa String?                 @map("organization_or_madrasa") @db.VarChar(200)
+  attendeesCount        Int                     @default(1) @map("attendees_count")
+  notes                 String?                 @db.Text
+  passNumber            String?                 @unique @map("pass_number") @db.VarChar(40)
+  status                EventRegistrationStatus @default(CONFIRMED)
+  paymentStatus         EventPaymentStatus      @default(FREE) @map("payment_status")
+  paymentReceiptFilename String?                @map("payment_receipt_filename") @db.VarChar(255)
+  paymentReceiptMimeType String?                @map("payment_receipt_mime_type") @db.VarChar(100)
+  createdAt             DateTime                @default(now()) @map("created_at")
+  checkedInAt           DateTime?               @map("checked_in_at")
+
+  @@index([eventId, status, createdAt])
+  @@index([phone])
+  @@map("event_registrations")
+}
+
+enum NotificationChannel {
+  EMAIL
+  WEB_PUSH
+  TELEGRAM
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+model EventNotificationSubscription {
+  id                         Int                   @id @default(autoincrement())
+  email                      String?               @db.VarChar(255)
+  normalizedEmail            String?               @unique @map("normalized_email") @db.VarChar(255)
+  name                       String                @default("Community Member") @db.VarChar(180)
+  manageToken                String                @unique @map("manage_token") @db.VarChar(64)
+  emailVerified              Boolean               @default(false) @map("email_verified")
+  emailVerificationToken     String?               @unique @map("email_verification_token") @db.VarChar(64)
+  emailVerificationExpiresAt DateTime?             @map("email_verification_expires_at")
+  enableEmail                Boolean               @default(false) @map("enable_email")
+  enableBrowser              Boolean               @default(false) @map("enable_browser")
+  enableAnnouncements        Boolean               @default(false) @map("enable_announcements")
+  categories                 Json
+  districts                  Json
+  reminderTiming             String                @default("24h_before") @map("reminder_timing") @db.VarChar(30)
+  specificEventIds           Json                  @map("specific_event_ids")
+  subscribedAt               DateTime              @default(now()) @map("subscribed_at")
+  createdAt                  DateTime              @default(now()) @map("created_at")
+  updatedAt                  DateTime              @updatedAt @map("updated_at")
+  notifications              NotificationLog[]
+  pushSubscriptions          WebPushSubscription[]
+
+  @@map("event_notification_subscriptions")
+}
+
+model WebPushSubscription {
+  id             Int                           @id @default(autoincrement())
+  subscriptionId Int                           @map("subscription_id")
+  subscription   EventNotificationSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  endpoint       String                        @db.Text
+  endpointHash   String                        @unique @map("endpoint_hash") @db.VarChar(64)
+  p256dh         String                        @db.VarChar(255)
+  auth           String                        @db.VarChar(255)
+  createdAt      DateTime                      @default(now()) @map("created_at")
+  updatedAt      DateTime                      @updatedAt @map("updated_at")
+  notifications  NotificationLog[]
+
+  @@index([subscriptionId])
+  @@map("web_push_subscriptions")
+}
+
+model NotificationLog {
+  id                 Int                            @id @default(autoincrement())
+  subscriptionId     Int?                           @map("subscription_id")
+  subscription       EventNotificationSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  pushSubscriptionId Int?                           @map("push_subscription_id")
+  pushSubscription   WebPushSubscription?           @relation(fields: [pushSubscriptionId], references: [id], onDelete: SetNull)
+  channel            NotificationChannel
+  notificationType   String                         @map("notification_type") @db.VarChar(40)
+  referenceType      String?                        @map("reference_type") @db.VarChar(40)
+  referenceId        Int?                           @map("reference_id")
+  recipient          String                         @db.VarChar(2048)
+  payload            Json
+  status             NotificationStatus             @default(QUEUED)
+  scheduledAt        DateTime                       @map("scheduled_at")
+  sentAt             DateTime?                      @map("sent_at")
+  errorMessage       String?                        @map("error_message") @db.Text
+  deduplicationKey   String                         @unique @map("deduplication_key") @db.VarChar(191)
+  createdAt          DateTime                       @default(now()) @map("created_at")
+
+  @@index([status, scheduledAt])
+  @@index([referenceType, referenceId])
+  @@map("notification_logs")
+}
+
+// Generic polymorphic translation store. entityType + entityId identify the
+// owning row (e.g. "woreda", "mosque", "announcement"); field identifies
+// which attribute is translated (e.g. "name", "description").
+model Translation {
+  id         Int      @id @default(autoincrement())
+  entityType String   @map("entity_type")
+  entityId   Int      @map("entity_id")
+  field      String
+  locale     String // "en" | "am" | "om" | "ar"
+  value      String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([entityType, entityId, field, locale])
+  @@index([entityType, entityId])
+  @@map("translations")
+}
+
+// Generic polymorphic file/document store, used by every feature module
+// that needs uploads (application docs, mosque photos, waqf deeds, etc.)
+model Document {
+  id         Int      @id @default(autoincrement())
+  entityType String   @map("entity_type")
+  entityId   Int      @map("entity_id")
+  url        String
+  fileName   String   @map("file_name")
+  mimeType   String   @map("mime_type")
+  sizeBytes  Int      @map("size_bytes")
+  uploadedBy Int?     @map("uploaded_by")
+  uploader   User?    @relation(fields: [uploadedBy], references: [id])
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@map("documents")
+}
+
+model CouncilArchiveDocument {
+  id                 Int                        @id @default(autoincrement())
+  title              String                     @db.VarChar(255)
+  category           String                     @default("General") @db.VarChar(100)
+  description        String?                    @db.Text
+  fileName           String                     @map("file_name") @db.VarChar(255)
+  mimeType           String                     @map("mime_type") @db.VarChar(255)
+  sizeBytes          Int                        @map("size_bytes")
+  cloudinaryPublicId String                     @unique @map("cloudinary_public_id") @db.VarChar(255)
+  cloudinaryVersion  Int                        @map("cloudinary_version")
+  uploadedBy         Int?                       @map("uploaded_by")
+  createdAt          DateTime                   @default(now()) @map("created_at")
+  shareLinks         CouncilDocumentShareLink[]
+
+  @@index([createdAt])
+  @@map("council_archive_documents")
+}
+
+model CouncilDocumentShareLink {
+  id         Int                    @id @default(autoincrement())
+  documentId Int                    @map("document_id")
+  document   CouncilArchiveDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tokenHash  String                 @unique @map("token_hash") @db.Char(64)
+  expiresAt  DateTime               @map("expires_at")
+  createdAt  DateTime               @default(now()) @map("created_at")
+
+  @@index([documentId, expiresAt])
+  @@index([expiresAt])
+  @@map("council_document_share_links")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    Int?     @map("actor_id")
+  actor      User?    @relation("ActorAuditLogs", fields: [actorId], references: [id])
+  action     String // "create" | "update" | "delete" | "login" | ...
+  entityType String   @map("entity_type")
+  entityId   Int?     @map("entity_id")
+  beforeJson Json?    @map("before_json")
+  afterJson  Json?    @map("after_json")
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3: Mosques & Madrasas directories
+// ---------------------------------------------------------------------------
+
+// Translated fields (name, description) live in the `translations` table
+// keyed by entityType="mosque"/"madrasa", entityId=this row's id.
+// Photos are stored in Cloudinary; only their URL and public ID live here.
+model Mosque {
+  id              Int      @id @default(autoincrement())
+  code            String?  @db.VarChar(50)
+  category        String?  @db.VarChar(16)
+  woredaId        Int      @map("woreda_id")
+  woreda          Woreda   @relation(fields: [woredaId], references: [id])
+  latitude        Float?
+  longitude       Float?
+  capacity        Int?
+  hasWuduFacility Boolean  @default(false) @map("has_wudu_facility")
+  hasBoarding     Boolean  @default(false) @map("has_boarding")
+  imamName        String?  @map("imam_name")
+  photoUrl        String?  @map("photo_url") @db.VarChar(1000)
+  photoPublicId   String?  @map("photo_public_id") @db.VarChar(255)
+  isPublished     Boolean  @default(true) @map("is_published")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  prayerTimes MosquePrayerTime[]
+  madrasa     Madrasa?
+
+  @@index([woredaId])
+  @@index([isPublished])
+  @@map("mosques")
+}
+
+model MosquePrayerTime {
+  id         Int      @id @default(autoincrement())
+  mosqueId   Int      @map("mosque_id")
+  mosque     Mosque   @relation(fields: [mosqueId], references: [id], onDelete: Cascade)
+  prayerName String   @map("prayer_name") // fajr | dhuhr | asr | maghrib | isha | jumuah
+  time       String // stored as "HH:MM" (24h, local time) — kept as a string to avoid timezone/date complications for a daily recurring time
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([mosqueId, prayerName])
+  @@map("mosque_prayer_times")
+}
+
+model Madrasa {
+  id                 Int       @id @default(autoincrement())
+  woredaId           Int       @map("woreda_id")
+  woreda             Woreda    @relation(fields: [woredaId], references: [id])
+  latitude           Float?
+  longitude          Float?
+  capacity           Int?
+  hasBoarding        Boolean   @default(false) @map("has_boarding")
+  mosqueId           Int?      @unique @map("mosque_id")
+  mosque             Mosque?   @relation(fields: [mosqueId], references: [id], onDelete: SetNull)
+  photoUrl           String?   @map("photo_url") @db.VarChar(1000)
+  photoPublicId      String?   @map("photo_public_id") @db.VarChar(255)
+  headTeacherId      Int?      @map("head_teacher_id")
+  headTeacher        Teacher?  @relation("MadrasaHeadTeacher", fields: [headTeacherId], references: [id], onDelete: SetNull)
+  hifzGraduatesCount Int?      @map("hifz_graduates_count")
+  isPublished        Boolean   @default(true) @map("is_published")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  teachers           Teacher[]
+  students           Student[]
+
+  @@index([woredaId])
+  @@index([isPublished])
+  @@map("madrasas")
+}
+
+model Teacher {
+  id                    Int       @id @default(autoincrement())
+  madrasaId             Int       @map("madrasa_id")
+  madrasa               Madrasa   @relation(fields: [madrasaId], references: [id])
+  name                  String    @db.VarChar(180)
+  qualification         String    @db.Text
+  specialization        String    @db.VarChar(240)
+  experienceYears       Int       @default(0) @map("experience_years")
+  studentsCount         Int       @default(0) @map("students_count")
+  assignedStudentsCount Int?      @map("assigned_students_count")
+  phone                 String    @db.VarChar(30)
+  email                 String    @db.VarChar(255)
+  status                String    @default("Active") @db.VarChar(30)
+  avatar                String?   @db.VarChar(1000)
+  sanad                 String?   @db.Text
+  salaryETB             Float?    @map("salary_etb")
+  isCertified           Boolean   @default(false) @map("is_certified")
+  isFeatured            Boolean   @default(false) @map("is_featured")
+  isPublished           Boolean   @default(false) @map("is_published")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  headOfMadrasas        Madrasa[] @relation("MadrasaHeadTeacher")
+
+  @@index([madrasaId])
+  @@index([isPublished, isFeatured])
+  @@map("teachers")
+}
+
+model Student {
+  id                 Int      @id @default(autoincrement())
+  name               String   @db.VarChar(180)
+  arabicName         String?  @map("arabic_name") @db.VarChar(180)
+  gender             String   @db.VarChar(20)
+  age                Int
+  madrasaId          Int      @map("madrasa_id")
+  madrasa            Madrasa  @relation(fields: [madrasaId], references: [id])
+  className          String   @map("class_name") @db.VarChar(180)
+  teacherId          String?  @map("teacher_id") @db.VarChar(80)
+  teacherName        String?  @map("teacher_name") @db.VarChar(180)
+  enrollmentDate     String   @map("enrollment_date") @db.VarChar(10)
+  attendanceRate     Float    @default(100) @map("attendance_rate")
+  quranJuzCompleted  Int      @default(0) @map("quran_juz_completed")
+  currentJuz         Int      @default(1) @map("current_juz")
+  currentJuzProgress Float    @default(0) @map("current_juz_progress")
+  hifzStatus         Json     @map("hifz_status")
+  tajweedRating      String   @map("tajweed_rating") @db.VarChar(40)
+  examScoreAvg       Float    @default(0) @map("exam_score_avg")
+  parentName         String   @map("parent_name") @db.VarChar(180)
+  parentPhone        String   @map("parent_phone") @db.VarChar(40)
+  guardianName       String?  @map("guardian_name") @db.VarChar(180)
+  guardianPhone      String?  @map("guardian_phone") @db.VarChar(40)
+  sabaqSurah         String?  @map("sabaq_surah") @db.VarChar(180)
+  sabaqAyahStart     Int?     @map("sabaq_ayah_start")
+  sabaqAyahEnd       Int?     @map("sabaq_ayah_end")
+  sabaqiJuz          Int?     @map("sabaqi_juz")
+  manzilJuz          String?  @map("manzil_juz") @db.VarChar(180)
+  dailyAttendance    String?  @map("daily_attendance") @db.VarChar(30)
+  level              String?  @db.VarChar(180)
+  status             String   @default("Active") @db.VarChar(30)
+  graduationYear     Int?     @map("graduation_year")
+  avatar             String?  @db.VarChar(1000)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@index([madrasaId])
+  @@index([name])
+  @@map("students")
+}
+
+model UlemaProfile {
+  id                 Int      @id @default(autoincrement())
+  name               String   @db.VarChar(180)
+  arabicName         String?  @map("arabic_name") @db.VarChar(180)
+  title              String   @db.VarChar(180)
+  specializations    Json
+  district           String   @db.VarChar(120)
+  assignedMosqueId   String?  @map("assigned_mosque_id") @db.VarChar(120)
+  assignedMosqueName String?  @map("assigned_mosque_name") @db.VarChar(180)
+  qualifications     Json
+  languages          Json
+  areasOfService     Json     @map("areas_of_service")
+  biography          String   @db.Text
+  contactPhone       String   @map("contact_phone") @db.VarChar(30)
+  email              String   @db.VarChar(255)
+  status             String   @default("Active") @db.VarChar(30)
+  avatar             String?  @db.VarChar(1000)
+  yearsOfDawah       Int      @default(0) @map("years_of_dawah")
+  isFeatured         Boolean  @default(false) @map("is_featured")
+  isPublished        Boolean  @default(false) @map("is_published")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@index([isPublished, isFeatured])
+  @@index([district])
+  @@map("ulema_profiles")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4: Zakat & Janazah application services
+// ---------------------------------------------------------------------------
+
+enum ApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+// Atomic per-service, per-year counter backing human-readable reference
+// numbers like "NIK-2026-00042". See common/services/referenceNumber.service.js.
+model ReferenceSequence {
+  id          Int    @id @default(autoincrement())
+  serviceCode String @map("service_code") // "NIK" | "ZKT" | "JNZ"
+  year        Int
+  lastNumber  Int    @default(0) @map("last_number")
+
+  @@unique([serviceCode, year])
+  @@map("reference_sequences")
+}
+
+model ZakatApplication {
+  id              Int               @id @default(autoincrement())
+  referenceNumber String            @unique @map("reference_number")
+  status          ApplicationStatus @default(SUBMITTED)
+  woredaId        Int               @map("woreda_id")
+  woreda          Woreda            @relation(fields: [woredaId], references: [id])
+
+  applicantFullName String  @map("applicant_full_name")
+  applicantPhone    String  @map("applicant_phone")
+  householdSize     Int?    @map("household_size")
+  eligibilityNotes  String? @map("eligibility_notes") @db.Text
+
+  assignedOfficerId Int?  @map("assigned_officer_id")
+  assignedOfficer   User? @relation("ZakatAssignedOfficer", fields: [assignedOfficerId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([woredaId])
+  @@index([status])
+  @@map("zakat_applications")
+}
+
+// Current gold/silver Nisab threshold, used by the frontend's Zakat/Ushr
+// calculator. Only the most recent row (by effectiveDate) is "current" —
+// older rows are kept for historical/audit reference.
+model NisabRate {
+  id                 Int      @id @default(autoincrement())
+  goldPricePerGram   Float    @map("gold_price_per_gram")
+  silverPricePerGram Float    @map("silver_price_per_gram")
+  effectiveDate      DateTime @map("effective_date")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([effectiveDate])
+  @@map("nisab_rates")
+}
+
+model JanazahRequest {
+  id              Int               @id @default(autoincrement())
+  referenceNumber String            @unique @map("reference_number")
+  status          ApplicationStatus @default(SUBMITTED)
+  woredaId        Int               @map("woreda_id")
+  woreda          Woreda            @relation(fields: [woredaId], references: [id])
+
+  deceasedName      String  @map("deceased_name")
+  contactName       String  @map("contact_name")
+  contactPhone      String  @map("contact_phone")
+  needsGhusl        Boolean @default(false) @map("needs_ghusl")
+  needsTransport    Boolean @default(false) @map("needs_transport")
+  needsCemeteryPlot Boolean @default(false) @map("needs_cemetery_plot")
+  locationNote      String? @map("location_note")
+
+  assignedOfficerId Int?  @map("assigned_officer_id")
+  assignedOfficer   User? @relation("JanazahAssignedOfficer", fields: [assignedOfficerId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([woredaId])
+  @@index([status])
+  @@map("janazah_requests")
+}
+
+model CemeteryPlot {
+  id          Int      @id @default(autoincrement())
+  woredaId    Int      @map("woreda_id")
+  woreda      Woreda   @relation(fields: [woredaId], references: [id])
+  code        String   @unique
+  isAvailable Boolean  @default(true) @map("is_available")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([woredaId])
+  @@map("cemetery_plots")
+}
+
+// Admin on/off switches for public civic intake forms (e.g. Janazah).
+// Missing rows are treated as enabled until an admin toggles them.
+model CivicServiceSetting {
+  serviceKey  String   @id @map("service_key") @db.VarChar(64)
+  isEnabled   Boolean  @default(true) @map("is_enabled")
+  updatedById Int?     @map("updated_by_id")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("civic_service_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5: Waqf Asset Registry & Financial Transparency
+// ---------------------------------------------------------------------------
+
+enum WaqfAssetType {
+  LAND
+  COMMERCIAL_RENTAL
+  AGRICULTURAL
+  CEMETERY
+}
+
+enum WaqfAssetStatus {
+  ACTIVE
+  UNDER_MAINTENANCE
+  DISPUTED
+  INACTIVE
+}
+
+// Translated name/description live in `translations` (entityType="waqf_asset").
+// Title deeds/contracts live in `documents` (entityType="waqf_asset").
+// tenantName/tenantContact/monthlyIncome are intentionally NOT translated or
+// public-facing fields — the service layer strips them from public reads;
+// see modules/waqf/waqf.service.js.
+model WaqfAsset {
+  id            Int             @id @default(autoincrement())
+  woredaId      Int             @map("woreda_id")
+  woreda        Woreda          @relation(fields: [woredaId], references: [id])
+  type          WaqfAssetType
+  status        WaqfAssetStatus @default(ACTIVE)
+  locationNote  String?         @map("location_note")
+  monthlyIncome Float?          @map("monthly_income")
+  tenantName    String?         @map("tenant_name")
+  tenantContact String?         @map("tenant_contact")
+  isPublished   Boolean         @default(true) @map("is_published")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  @@index([woredaId])
+  @@index([type])
+  @@index([isPublished])
+  @@map("waqf_assets")
+}
+
+enum FinancialReportType {
+  BALANCE_SHEET
+  ZAKAT_AUDIT
+  EXPENDITURE
+}
+
+// Translated title/summary live in `translations` (entityType="financial_report").
+// Audited PDF attachments live in `documents` (entityType="financial_report").
+model FinancialReport {
+  id          Int                 @id @default(autoincrement())
+  type        FinancialReportType
+  periodLabel String              @map("period_label") // e.g. "Q1 2026", "FY 2025"
+  periodStart DateTime            @map("period_start")
+  periodEnd   DateTime            @map("period_end")
+  isPublished Boolean             @default(true) @map("is_published")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  lineItems FinancialReportLineItem[]
+
+  @@index([type])
+  @@index([periodStart])
+  @@index([isPublished])
+  @@map("financial_reports")
+}
+
+model FinancialReportLineItem {
+  id                Int             @id @default(autoincrement())
+  financialReportId Int             @map("financial_report_id")
+  financialReport   FinancialReport @relation(fields: [financialReportId], references: [id], onDelete: Cascade)
+  category          String // e.g. "Zakat Collected", "Mosque Maintenance", "Waqf Rental Income"
+  amount            Float
+  notes             String?
+
+  @@index([financialReportId])
+  @@map("financial_report_line_items")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 7: Fatwa Archive & Leadership Directory
+// ---------------------------------------------------------------------------
+
+// Translated question/ruling live in `translations` (entityType="fatwa").
+model Fatwa {
+  id          Int      @id @default(autoincrement())
+  category    String
+  isPublished Boolean  @default(true) @map("is_published")
+  publishedAt DateTime @default(now()) @map("published_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([isPublished])
+  @@index([publishedAt])
+  @@map("fatwas")
+}
+
+// Translated name/role/bio live in `translations` (entityType="leadership_profile").
+// Photo lives in `documents` (entityType="leadership_profile").
+model LeadershipProfile {
+  id           Int      @id @default(autoincrement())
+  displayOrder Int      @default(0) @map("display_order")
+  isPublished  Boolean  @default(true) @map("is_published")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([isPublished])
+  @@index([displayOrder])
+  @@map("leadership_profiles")
+}
+
+model ZakatAssessment {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String   @db.VarChar(180)
+  assessedAt DateTime @default(now()) @map("assessed_at")
+  summary    Json
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([userId, assessedAt])
+  @@map("zakat_assessments")
+}
+
+model ZakatDistribution {
+  id                  Int       @id @default(autoincrement())
+  asnafCategory       String    @map("asnaf_category") @db.VarChar(120)
+  arabicName          String?   @map("arabic_name") @db.VarChar(180)
+  woredaDistrict      String?   @map("woreda_district") @db.VarChar(180)
+  beneficiaryCount    Int       @default(1) @map("beneficiary_count")
+  totalDisbursedETB   Decimal   @map("total_disbursed_etb") @db.Decimal(14, 2)
+  lastDisbursalDate   DateTime  @default(now()) @map("last_disbursal_date")
+  distributionChannel String?   @map("distribution_channel") @db.VarChar(120)
+  leadOfficer         String?   @map("lead_officer") @db.VarChar(150)
+  notes               String    @db.Text
+  beneficiaryName     String?   @map("beneficiary_name") @db.VarChar(150)
+  category            String?   @db.VarChar(100)
+  amountETB           Decimal?  @map("amount_etb") @db.Decimal(14, 2)
+  district            String?   @db.VarChar(180)
+  verificationStatus  String?   @map("verification_status") @db.VarChar(40)
+  disbursementDate    DateTime? @map("disbursement_date")
+  approvedBy          String?   @map("approved_by") @db.VarChar(150)
+  createdById         Int       @map("created_by_id")
+  createdBy           User      @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  @@index([asnafCategory, lastDisbursalDate])
+  @@index([district, lastDisbursalDate])
+  @@index([createdById, createdAt])
+  @@map("zakat_distributions")
+}
+
+enum DonationIntentStatus {
+  PENDING_PAYMENT
+  PAYMENT_REPORTED
+  CONFIRMED
+  CANCELLED
+}
+
+model DonationIntent {
+  id            Int                  @id @default(autoincrement())
+  reference     String               @unique @db.VarChar(32)
+  donorName     String?              @map("donor_name") @db.VarChar(150)
+  donorPhone    String               @map("donor_phone") @db.VarChar(30)
+  donorEmail    String?              @map("donor_email") @db.VarChar(255)
+  anonymous     Boolean              @default(false)
+  amountETB     Decimal              @map("amount_etb") @db.Decimal(14, 2)
+  fundName      String               @map("fund_name") @db.VarChar(120)
+  category      String               @db.VarChar(80)
+  paymentMethod String               @map("payment_method") @db.VarChar(30)
+  status        DonationIntentStatus @default(PENDING_PAYMENT)
+  createdAt     DateTime             @default(now()) @map("created_at")
+
+  @@index([donorPhone, createdAt])
+  @@index([status, createdAt])
+  @@map("donation_intents")
+}

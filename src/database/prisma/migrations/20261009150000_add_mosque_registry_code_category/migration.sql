@@ -1,0 +1,3 @@
+ALTER TABLE `mosques`
+  ADD COLUMN `code` VARCHAR(50) NULL,
+  ADD COLUMN `category` VARCHAR(16) NULL;

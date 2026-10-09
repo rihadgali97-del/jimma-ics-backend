@@ -1,0 +1,2 @@
+ALTER TABLE `notification_logs`
+    MODIFY `status` ENUM('QUEUED', 'SENDING', 'SENT', 'FAILED', 'CANCELLED') NOT NULL DEFAULT 'QUEUED';

@@ -1,0 +1,2 @@
+ALTER TABLE `woredas`
+ADD COLUMN `is_active` BOOLEAN NOT NULL DEFAULT true;

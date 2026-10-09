@@ -1,0 +1,17 @@
+ALTER TABLE `woredas`
+  ADD COLUMN `oromo_name` VARCHAR(180) NULL,
+  ADD COLUMN `arabic_name` VARCHAR(180) NULL,
+  ADD COLUMN `zone` VARCHAR(120) NULL,
+  ADD COLUMN `climate_zone` VARCHAR(40) NULL,
+  ADD COLUMN `center_latitude` DOUBLE NULL,
+  ADD COLUMN `center_longitude` DOUBLE NULL,
+  ADD COLUMN `svg_path` TEXT NULL,
+  ADD COLUMN `label_x` DOUBLE NULL,
+  ADD COLUMN `label_y` DOUBLE NULL,
+  ADD COLUMN `area_km2` DOUBLE NULL,
+  ADD COLUMN `elevation_meters` INTEGER NULL,
+  ADD COLUMN `population` INTEGER NULL,
+  ADD COLUMN `muslim_percentage` DOUBLE NULL,
+  ADD COLUMN `council_branch_head` VARCHAR(180) NULL,
+  ADD COLUMN `head_contact` VARCHAR(40) NULL,
+  ADD COLUMN `notable_features` JSON NULL;

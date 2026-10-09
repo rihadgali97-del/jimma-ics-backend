@@ -1,0 +1,2 @@
+ALTER TABLE `users` ADD COLUMN `metadata` JSON NULL;
+ALTER TABLE `roles` ADD COLUMN `metadata` JSON NULL;
