@@ -39,10 +39,10 @@ function hasOAuthConfiguration() {
 }
 
 async function getGmailAccessToken(config) {
-  const response = await fetch('https://oauth2.googleapis.com/token', {
+  const response = await globalThis.fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
+    body: new globalThis.URLSearchParams({
       client_id: config.clientId,
       client_secret: config.clientSecret,
       refresh_token: config.refreshToken,
@@ -125,7 +125,7 @@ function buildRawEmail({ from, to, subject, text, html, attachments = [] }) {
 async function sendViaGmailApi(recipient, message, html, text, attachments) {
   const config = getOAuth2Config();
   const accessToken = await getGmailAccessToken(config);
-  const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+  const response = await globalThis.fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
     method: 'POST',
     headers: {
       authorization: `Bearer ${accessToken}`,

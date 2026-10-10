@@ -45,6 +45,22 @@ export const notificationsRepository = {
     });
   },
 
+  findUpcomingPublishedEvents(fromDate) {
+    const startOfDay = new Date(Date.UTC(
+      fromDate.getUTCFullYear(),
+      fromDate.getUTCMonth(),
+      fromDate.getUTCDate()
+    ));
+    return prisma.councilEvent.findMany({
+      where: {
+        isPublished: true,
+        status: { not: 'Cancelled' },
+        date: { gte: startOfDay },
+      },
+      orderBy: [{ date: 'asc' }, { id: 'asc' }],
+    });
+  },
+
   findAnnouncementSubscriptions() {
     return prisma.eventNotificationSubscription.findMany({
       where: { enableAnnouncements: true, enableEmail: true, emailVerified: true, email: { not: null } },

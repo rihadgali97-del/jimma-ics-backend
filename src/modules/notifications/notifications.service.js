@@ -38,6 +38,13 @@ export async function getSubscription(manageToken) {
   return toPublicSubscription(subscription);
 }
 
+async function queueUpcomingEventNotifications() {
+  const events = await notificationsRepository.findUpcomingPublishedEvents(new Date());
+  for (const event of events) {
+    await queueEventNotifications(event);
+  }
+}
+
 async function queueEmailVerification(subscription, token) {
   await notificationsRepository.enqueueMany([{
     channel: 'EMAIL',
@@ -83,6 +90,7 @@ export async function saveSubscription(data, manageToken) {
       emailVerificationExpiresAt: verificationToken ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null,
     });
     if (verificationToken) await queueEmailVerification(subscription, verificationToken);
+    await queueUpcomingEventNotifications();
     return { ...toPublicSubscription(subscription), manageToken, created: false };
   }
 
@@ -105,6 +113,7 @@ export async function saveSubscription(data, manageToken) {
     emailVerificationExpiresAt: verificationToken ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null,
   });
   if (verificationToken) await queueEmailVerification(subscription, verificationToken);
+  await queueUpcomingEventNotifications();
   return { ...toPublicSubscription(subscription), manageToken: newManageToken, created: true };
 }
 
@@ -113,7 +122,9 @@ export async function verifyEmail(token) {
   if (!subscription || !subscription.emailVerificationExpiresAt || subscription.emailVerificationExpiresAt <= new Date()) {
     throw new NotFoundError('Email verification link is invalid or expired');
   }
-  return toPublicSubscription(await notificationsRepository.markEmailVerified(subscription.id));
+  const verifiedSubscription = await notificationsRepository.markEmailVerified(subscription.id);
+  await queueUpcomingEventNotifications();
+  return toPublicSubscription(verifiedSubscription);
 }
 
 export async function savePushSubscription(manageToken, data) {
@@ -125,6 +136,7 @@ export async function savePushSubscription(manageToken, data) {
     p256dh: data.keys.p256dh,
     auth: data.keys.auth,
   });
+  await queueUpcomingEventNotifications();
   return { registered: true };
 }
 
@@ -286,7 +298,10 @@ function eventPayload(event) {
 }
 
 function emailEventLog(subscription, event, scheduledAt, notificationType) {
-  const versionKey = event.updatedAt?.toISOString() || event.date.toISOString();
+  const versionKey = [
+    event.updatedAt?.toISOString() || event.date.toISOString(),
+    subscription.updatedAt?.toISOString() || subscription.createdAt?.toISOString() || 'current',
+  ].join(':');
   return {
     subscriptionId: subscription.id,
     channel: 'EMAIL',
@@ -305,7 +320,10 @@ function emailEventLog(subscription, event, scheduledAt, notificationType) {
 }
 
 function pushEventLog(subscription, pushSubscription, event, scheduledAt, notificationType) {
-  const versionKey = event.updatedAt?.toISOString() || event.date.toISOString();
+  const versionKey = [
+    event.updatedAt?.toISOString() || event.date.toISOString(),
+    subscription.updatedAt?.toISOString() || subscription.createdAt?.toISOString() || 'current',
+  ].join(':');
   return {
     subscriptionId: subscription.id,
     pushSubscriptionId: pushSubscription.id,
@@ -355,6 +373,7 @@ export async function queueEventNotifications(event, { reason = 'published' } = 
       (matchesFilter(subscription.specificEventIds, String(event.id)) || subscription.specificEventIds.length === 0)
     ))
     .flatMap((subscription) => {
+      if (!immediate && eventStartTime(event) <= now) return [];
       let reminder = immediate ? now : scheduledTime(event, subscription.reminderTiming, now);
       if (reminder && reminder < now && eventStartTime(event) > now) reminder = now;
       if (!reminder || reminder < now) return [];

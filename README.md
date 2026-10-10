@@ -105,9 +105,14 @@ channel. Event registration requires a valid email address; confirmation
 emails are queued when a free registration is confirmed and after a paid
 registration's payment is approved.
 Event reminders and urgent announcements are delivered by email only after
-the subscriber verifies their address. The BullMQ worker scans the database
-outbox for due records every 15 seconds, retries provider failures, and marks
-final delivery status in the outbox.
+the subscriber verifies their address. Email is the default subscription
+channel; subscribers can choose instant, 24-hour, 48-hour, or weekly-digest
+timing and filter events by category, district, or selected event. Saving
+preferences, verifying an email, or registering a browser push device also
+queues eligible upcoming published events, so subscribers can join after
+publication and still receive their selected reminder. The BullMQ worker scans
+the database outbox for due records every 15 seconds, retries provider
+failures, and marks final delivery status in the outbox.
 
 Configure email delivery in one of two supported ways:
 

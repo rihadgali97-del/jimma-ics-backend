@@ -9,6 +9,7 @@ const mockRepository = {
   updateSubscription: jest.fn(),
   deleteSubscription: jest.fn(),
   findMatchingEventSubscriptions: jest.fn(),
+  findUpcomingPublishedEvents: jest.fn(),
   findAnnouncementSubscriptions: jest.fn(),
   enqueueMany: jest.fn(),
   cancelQueuedForReference: jest.fn(),
@@ -38,6 +39,7 @@ const { env } = await import('../src/config/env.js');
 beforeEach(() => {
   jest.clearAllMocks();
   env.TELEGRAM_CHANNEL_ID = '@riho_information';
+  mockRepository.findUpcomingPublishedEvents.mockResolvedValue([]);
 });
 
 describe('Notification subscription service', () => {
@@ -119,6 +121,61 @@ describe('Notification subscription service', () => {
       id: '5',
       emailVerified: true,
     });
+  });
+
+  it('queues matching upcoming event alerts after email verification', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-10-10T00:00:00.000Z'));
+    const event = {
+      id: 18,
+      title: 'Community Lecture',
+      category: 'Lecture',
+      date: new Date('2026-10-12T00:00:00.000Z'),
+      time: '09:00',
+      location: 'Jimma Mosque',
+      district: 'Jimma',
+      description: 'A community lecture.',
+      isPublished: true,
+      status: 'Upcoming',
+      updatedAt: new Date('2026-10-01T00:00:00.000Z'),
+    };
+    mockRepository.findSubscriptionByVerificationToken.mockResolvedValue({
+      id: 5,
+      email: 'community@example.com',
+      emailVerified: false,
+      emailVerificationExpiresAt: new Date('2026-10-11T00:00:00.000Z'),
+    });
+    mockRepository.markEmailVerified.mockResolvedValue({
+      id: 5,
+      email: 'community@example.com',
+      emailVerified: true,
+      subscribedAt: new Date('2026-10-04T00:00:00.000Z'),
+    });
+    mockRepository.findUpcomingPublishedEvents.mockResolvedValue([event]);
+    mockRepository.findMatchingEventSubscriptions.mockResolvedValue([{
+      id: 5,
+      email: 'community@example.com',
+      emailVerified: true,
+      enableEmail: true,
+      enableBrowser: false,
+      categories: ['Lecture'],
+      districts: ['Jimma'],
+      specificEventIds: ['18'],
+      reminderTiming: '24h_before',
+      pushSubscriptions: [],
+    }]);
+    mockRepository.enqueueMany.mockResolvedValue(2);
+
+    await service.verifyEmail('a'.repeat(64));
+
+    const queuedRecords = mockRepository.enqueueMany.mock.calls[0][0];
+    expect(queuedRecords).toContainEqual(expect.objectContaining({
+      channel: 'EMAIL',
+      recipient: 'community@example.com',
+      notificationType: 'EVENT_REMINDER',
+      referenceId: 18,
+      scheduledAt: new Date('2026-10-11T06:00:00.000Z'),
+    }));
+    jest.useRealTimers();
   });
 
   it('rejects expired verification tokens', async () => {
