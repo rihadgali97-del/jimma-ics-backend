@@ -12,6 +12,7 @@ import {
   retryNotificationLog,
   saveSubscription,
   savePushSubscription,
+  sendPushTestNotification,
   sendTelegramGatewayBroadcast,
   verifyEmail,
 } from './notifications.service.js';
@@ -72,6 +73,15 @@ export const saveCurrentPushSubscription = [
     sendSuccess(res, {
       data: await savePushSubscription(req.notificationManageToken, req.body),
       statusCode: 201,
+    });
+  }),
+];
+
+export const sendCurrentPushTestNotification = [
+  readManageToken,
+  asyncHandler(async (req, res) => {
+    sendSuccess(res, {
+      data: await sendPushTestNotification(req.notificationManageToken, req.body.endpoint),
     });
   }),
 ];

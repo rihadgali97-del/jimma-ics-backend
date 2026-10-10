@@ -99,6 +99,11 @@ export const notificationsRepository = {
     return prisma.webPushSubscription.findUnique({ where: { id } });
   },
 
+  findPushSubscriptionByEndpoint(subscriptionId, endpoint) {
+    const endpointHash = createHash('sha256').update(endpoint).digest('hex');
+    return prisma.webPushSubscription.findFirst({ where: { subscriptionId, endpointHash } });
+  },
+
   countPushSubscriptions(subscriptionId) {
     return prisma.webPushSubscription.count({ where: { subscriptionId } });
   },
@@ -174,7 +179,15 @@ export const notificationsRepository = {
     return prisma.notificationLog.create({ data });
   },
 
+  createPushTestLog(data) {
+    return prisma.notificationLog.create({ data });
+  },
+
   updateTelegramGatewayLog(id, data) {
+    return prisma.notificationLog.update({ where: { id }, data });
+  },
+
+  updatePushTestLog(id, data) {
     return prisma.notificationLog.update({ where: { id }, data });
   },
 

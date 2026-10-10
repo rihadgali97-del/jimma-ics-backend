@@ -4,6 +4,7 @@ import { ConflictError, NotFoundError } from '../../common/errors/httpErrors.js'
 import { buildPaginationMeta, parsePagination } from '../../common/utils/pagination.js';
 import { notificationsRepository } from './notifications.repository.js';
 import { sendTelegram } from '../../common/services/notifications/providers/telegram.provider.js';
+import { sendPush } from '../../common/services/notifications/providers/push.provider.js';
 
 function toSubscriptionData(data) {
   const email = data.email?.trim() || null;
@@ -144,6 +145,51 @@ export async function removePushSubscription(manageToken, endpoint) {
   const subscription = await notificationsRepository.findSubscriptionByToken(manageToken);
   if (!subscription) throw new NotFoundError('Notification subscription not found');
   await notificationsRepository.deletePushSubscriptionByEndpoint(subscription.id, endpoint);
+}
+
+export async function sendPushTestNotification(manageToken, endpoint) {
+  const subscription = await notificationsRepository.findSubscriptionByToken(manageToken);
+  if (!subscription) throw new NotFoundError('Notification subscription not found');
+  if (!subscription.enableBrowser) {
+    throw new ConflictError('Enable and save browser notifications before sending a test');
+  }
+
+  const pushSubscription = await notificationsRepository.findPushSubscriptionByEndpoint(subscription.id, endpoint);
+  if (!pushSubscription) throw new NotFoundError('This browser is not registered for push notifications');
+
+  const log = await notificationsRepository.createPushTestLog({
+    subscriptionId: subscription.id,
+    pushSubscriptionId: pushSubscription.id,
+    channel: 'WEB_PUSH',
+    notificationType: 'PUSH_TEST',
+    referenceType: 'push_subscription',
+    referenceId: pushSubscription.id,
+    recipient: String(pushSubscription.id),
+    payload: {
+      title: 'Jimma Islamic Council test notification',
+      body: 'Remote push is working on this browser.',
+      url: '/events',
+    },
+    status: 'SENDING',
+    scheduledAt: new Date(),
+    deduplicationKey: `push-test:${randomUUID()}`,
+  });
+
+  try {
+    await sendPush(pushSubscription, log.payload);
+    await notificationsRepository.updatePushTestLog(log.id, {
+      status: 'SENT',
+      sentAt: new Date(),
+      errorMessage: null,
+    });
+    return { id: String(log.id), status: 'SENT' };
+  } catch (error) {
+    await notificationsRepository.updatePushTestLog(log.id, {
+      status: 'FAILED',
+      errorMessage: String(error instanceof Error ? error.message : error).slice(0, 5000),
+    });
+    throw error;
+  }
 }
 
 export function getPushConfiguration() {

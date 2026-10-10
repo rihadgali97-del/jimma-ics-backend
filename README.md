@@ -135,7 +135,9 @@ logs, or chat).
 Subscribers receive a time-limited verification link before subscription email
 is used. For remote browser push, configure `VAPID_PUBLIC_KEY`,
 `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`; generate a key pair with
-`npx web-push generate-vapid-keys`. For Telegram, configure
+`npx web-push generate-vapid-keys`. Subscribers can use **Send Remote Push
+Test** in their preferences to send a rate-limited test only to the current
+registered browser; the result is recorded in notification history. For Telegram, configure
 `TELEGRAM_BOT_TOKEN` and (if needed) `TELEGRAM_CHANNEL_ID`; the default target
 is `@riho_information` (`t.me/riho_information`). The bot must be added to that
 channel with permission to post. SMS is intentionally disabled until gateway

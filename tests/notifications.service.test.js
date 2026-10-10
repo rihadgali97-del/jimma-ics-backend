@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 
 const sendTelegramMock = jest.fn();
+const sendPushMock = jest.fn();
 const mockRepository = {
   findSubscriptionByToken: jest.fn(),
   findSubscriptionByEmail: jest.fn(),
@@ -16,7 +17,10 @@ const mockRepository = {
   cancelQueuedForSubscription: jest.fn(),
   markEmailVerified: jest.fn(),
   upsertPushSubscription: jest.fn(),
+  findPushSubscriptionByEndpoint: jest.fn(),
   deletePushSubscriptionByEndpoint: jest.fn(),
+  createPushTestLog: jest.fn(),
+  updatePushTestLog: jest.fn(),
   findLogStatus: jest.fn(),
   requeueFailedLog: jest.fn(),
   listLogs: jest.fn(),
@@ -30,6 +34,9 @@ jest.unstable_mockModule('../src/modules/notifications/notifications.repository.
 }));
 jest.unstable_mockModule('../src/common/services/notifications/providers/telegram.provider.js', () => ({
   sendTelegram: sendTelegramMock,
+}));
+jest.unstable_mockModule('../src/common/services/notifications/providers/push.provider.js', () => ({
+  sendPush: sendPushMock,
 }));
 
 const service = await import('../src/modules/notifications/notifications.service.js');
@@ -198,6 +205,72 @@ describe('Notification subscription service', () => {
     mockRepository.findLogStatus.mockResolvedValue({ id: 27, status: 'SENT' });
     await expect(service.retryNotificationLog(27)).rejects.toMatchObject({ statusCode: 409 });
     expect(mockRepository.requeueFailedLog).not.toHaveBeenCalled();
+  });
+
+  it('sends and records a remote push test only for the selected subscribed device', async () => {
+    const subscription = { id: 5, enableBrowser: true };
+    const pushSubscription = {
+      id: 12,
+      subscriptionId: 5,
+      endpoint: 'https://push.example.test/device',
+      p256dh: 'public-key',
+      auth: 'auth-secret',
+    };
+    mockRepository.findSubscriptionByToken.mockResolvedValue(subscription);
+    mockRepository.findPushSubscriptionByEndpoint.mockResolvedValue(pushSubscription);
+    mockRepository.createPushTestLog.mockResolvedValue({
+      id: 98,
+      payload: {
+        title: 'Jimma Islamic Council test notification',
+        body: 'Remote push is working on this browser.',
+        url: '/events',
+      },
+    });
+    mockRepository.updatePushTestLog.mockResolvedValue({});
+
+    await expect(service.sendPushTestNotification('a'.repeat(64), pushSubscription.endpoint))
+      .resolves.toEqual({ id: '98', status: 'SENT' });
+
+    expect(mockRepository.findPushSubscriptionByEndpoint).toHaveBeenCalledWith(5, pushSubscription.endpoint);
+    expect(mockRepository.createPushTestLog).toHaveBeenCalledWith(expect.objectContaining({
+      subscriptionId: 5,
+      pushSubscriptionId: 12,
+      channel: 'WEB_PUSH',
+      notificationType: 'PUSH_TEST',
+      status: 'SENDING',
+    }));
+    expect(sendPushMock).toHaveBeenCalledWith(pushSubscription, expect.objectContaining({
+      body: 'Remote push is working on this browser.',
+    }));
+    expect(mockRepository.updatePushTestLog).toHaveBeenCalledWith(98, expect.objectContaining({
+      status: 'SENT',
+      sentAt: expect.any(Date),
+      errorMessage: null,
+    }));
+  });
+
+  it('records failed remote push tests and returns the provider failure', async () => {
+    mockRepository.findSubscriptionByToken.mockResolvedValue({ id: 5, enableBrowser: true });
+    mockRepository.findPushSubscriptionByEndpoint.mockResolvedValue({ id: 12, subscriptionId: 5 });
+    mockRepository.createPushTestLog.mockResolvedValue({ id: 98, payload: {} });
+    mockRepository.updatePushTestLog.mockResolvedValue({});
+    sendPushMock.mockRejectedValue(new Error('Push service rejected the request'));
+
+    await expect(service.sendPushTestNotification('a'.repeat(64), 'https://push.example.test/device'))
+      .rejects.toThrow('Push service rejected the request');
+    expect(mockRepository.updatePushTestLog).toHaveBeenCalledWith(98, expect.objectContaining({
+      status: 'FAILED',
+      errorMessage: 'Push service rejected the request',
+    }));
+  });
+
+  it('does not send remote push tests when browser notifications are disabled', async () => {
+    mockRepository.findSubscriptionByToken.mockResolvedValue({ id: 5, enableBrowser: false });
+
+    await expect(service.sendPushTestNotification('a'.repeat(64), 'https://push.example.test/device'))
+      .rejects.toMatchObject({ statusCode: 409 });
+    expect(mockRepository.findPushSubscriptionByEndpoint).not.toHaveBeenCalled();
+    expect(sendPushMock).not.toHaveBeenCalled();
   });
 });
 

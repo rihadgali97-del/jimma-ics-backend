@@ -37,6 +37,12 @@ notificationsPublicRouter.post(
   validate(pushSubscriptionSchema),
   notificationsController.saveCurrentPushSubscription
 );
+notificationsPublicRouter.post(
+  '/subscriptions/current/push/test',
+  strictRateLimiter({ windowMs: 60 * 60 * 1000, max: 3 }),
+  validate(removePushSubscriptionSchema),
+  notificationsController.sendCurrentPushTestNotification
+);
 notificationsPublicRouter.delete(
   '/subscriptions/current/push',
   validate(removePushSubscriptionSchema),
