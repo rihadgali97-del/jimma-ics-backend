@@ -247,6 +247,7 @@ function eventRegistrationHtml(message) {
       <div style="text-align:center;margin:24px 0">
         <img src="cid:event-pass-qr" alt="Scannable event pass ${escapeHtml(message.passNumber)}" width="256" height="256" style="width:256px;height:256px">
         <p style="font-size:12px;color:#57534e">Your pass QR is also attached as a downloadable PNG.</p>
+        <a href="cid:event-pass-qr" download="Event-Pass-${escapeHtml(message.passNumber.replace(/[^A-Za-z0-9_-]/g, '_'))}.png" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#047857;color:#ffffff;text-decoration:none;font-weight:bold">Download QR pass</a>
       </div>
       <p style="font-size:12px;color:#78716c">Jimma Islamic Council</p>
     </div>

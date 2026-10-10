@@ -82,6 +82,8 @@ describe('Notification delivery providers', () => {
 
     const mail = sendMail.mock.calls[0][0];
     expect(mail.html).toContain('cid:event-pass-qr');
+    expect(mail.html).toContain('href="cid:event-pass-qr"');
+    expect(mail.html).toContain('Download QR pass');
     expect(mail.html).toContain('Community Lecture');
     expect(mail.text).toContain('downloadable QR pass is attached as a PNG');
     expect(mail.attachments).toHaveLength(1);
