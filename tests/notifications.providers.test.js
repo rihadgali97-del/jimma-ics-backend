@@ -12,6 +12,10 @@ describe('Notification delivery providers', () => {
   const originalEnv = {
     GMAIL_SMTP_USER: env.GMAIL_SMTP_USER,
     GMAIL_APP_PASSWORD: env.GMAIL_APP_PASSWORD,
+    GMAIL_CLIENT_ID: env.GMAIL_CLIENT_ID,
+    GMAIL_CLIENT_SECRET: env.GMAIL_CLIENT_SECRET,
+    GMAIL_REFRESH_TOKEN: env.GMAIL_REFRESH_TOKEN,
+    GMAIL_OAUTH2_USER: env.GMAIL_OAUTH2_USER,
     EMAIL_FROM_ADDRESS: env.EMAIL_FROM_ADDRESS,
     TELEGRAM_BOT_TOKEN: env.TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHANNEL_ID: env.TELEGRAM_CHANNEL_ID,
@@ -28,6 +32,10 @@ describe('Notification delivery providers', () => {
   it('sends email through Gmail SMTP and includes escaped content', async () => {
     env.GMAIL_SMTP_USER = 'sender@gmail.com';
     env.GMAIL_APP_PASSWORD = 'test app password';
+    env.GMAIL_CLIENT_ID = undefined;
+    env.GMAIL_CLIENT_SECRET = undefined;
+    env.GMAIL_REFRESH_TOKEN = undefined;
+    env.GMAIL_OAUTH2_USER = undefined;
     env.EMAIL_FROM_ADDRESS = 'Jimma Council <alerts@example.org>';
     const sendMail = jest.fn().mockResolvedValue({ messageId: 'test-message' });
     const close = jest.fn();
@@ -53,6 +61,10 @@ describe('Notification delivery providers', () => {
   it('emails event registrants an inline and downloadable QR pass', async () => {
     env.GMAIL_SMTP_USER = 'sender@gmail.com';
     env.GMAIL_APP_PASSWORD = 'test app password';
+    env.GMAIL_CLIENT_ID = undefined;
+    env.GMAIL_CLIENT_SECRET = undefined;
+    env.GMAIL_REFRESH_TOKEN = undefined;
+    env.GMAIL_OAUTH2_USER = undefined;
     const sendMail = jest.fn().mockResolvedValue({ messageId: 'event-pass-message' });
     jest.spyOn(nodemailer, 'createTransport').mockReturnValue({ sendMail, close: jest.fn() });
 
@@ -82,6 +94,41 @@ describe('Notification delivery providers', () => {
     expect(mail.attachments[0].content.subarray(0, 8)).toEqual(
       Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
     );
+  }, 10_000);
+
+  it('sends through the Gmail API over HTTPS when OAuth credentials are configured', async () => {
+    env.GMAIL_SMTP_USER = 'sender@gmail.com';
+    env.GMAIL_CLIENT_ID = 'client-id';
+    env.GMAIL_CLIENT_SECRET = 'client-secret';
+    env.GMAIL_REFRESH_TOKEN = 'refresh-token';
+    env.GMAIL_OAUTH2_USER = 'sender@gmail.com';
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'short-lived-access-token' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'gmail-api-message' }),
+      });
+
+    const result = await sendEmail('person@example.org', { title: 'OAuth message' });
+
+    expect(global.fetch).toHaveBeenNthCalledWith(1, 'https://oauth2.googleapis.com/token', expect.objectContaining({
+      method: 'POST',
+      body: expect.any(URLSearchParams),
+    }));
+    expect(global.fetch).toHaveBeenNthCalledWith(2, 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send', expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({ authorization: 'Bearer short-lived-access-token' }),
+    }));
+    const request = JSON.parse(global.fetch.mock.calls[1][1].body);
+    const rawMessage = Buffer.from(request.raw, 'base64url').toString();
+    expect(rawMessage).toContain('To: person@example.org');
+    expect(rawMessage).toContain(Buffer.from('OAuth message').toString('base64'));
+    expect(result).toEqual({ messageId: 'gmail-api-message' });
   });
 
   it('sends Telegram messages to the configured information channel', async () => {
@@ -137,6 +184,10 @@ describe('Notification delivery providers', () => {
   it('fails explicitly when provider credentials are absent', async () => {
     env.GMAIL_SMTP_USER = undefined;
     env.GMAIL_APP_PASSWORD = undefined;
+    env.GMAIL_CLIENT_ID = undefined;
+    env.GMAIL_CLIENT_SECRET = undefined;
+    env.GMAIL_REFRESH_TOKEN = undefined;
+    env.GMAIL_OAUTH2_USER = undefined;
     env.EMAIL_FROM_ADDRESS = undefined;
     env.TELEGRAM_BOT_TOKEN = undefined;
     env.VAPID_PUBLIC_KEY = undefined;

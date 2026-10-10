@@ -117,7 +117,7 @@ describe('Events service', () => {
         event,
         fullName: 'Amina Ahmed',
         phone: '+251911234567',
-        email: null,
+        email: 'amina@example.com',
         district: 'Jimma',
         organizationOrMadrasa: null,
         attendeesCount: 2,
@@ -132,6 +132,7 @@ describe('Events service', () => {
     const result = await eventsService.registerForEvent(42, {
       fullName: 'Amina Ahmed',
       phone: '+251911234567',
+      email: 'amina@example.com',
       district: 'Jimma',
       attendeesCount: 2,
     });
@@ -139,6 +140,9 @@ describe('Events service', () => {
     expect(result).toMatchObject({ id: '81', eventId: '42', status: 'Confirmed', attendeesCount: 2 });
     expect(result.passNumber).toMatch(/^JIC-PASS-\d{4}-[A-F0-9]{10}$/);
     expect(mockRepository.register).toHaveBeenCalledWith(42, expect.objectContaining({ attendeesCount: 2 }), result.passNumber, null);
+    expect(mockQueueRegistrationConfirmation).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'amina@example.com' })
+    );
   });
 
   it('returns a conflict when there are not enough seats', async () => {
@@ -146,8 +150,21 @@ describe('Events service', () => {
     mockRepository.register.mockResolvedValue({ full: true });
 
     await expect(eventsService.registerForEvent(42, {
-      fullName: 'Amina Ahmed', phone: '+251911234567', district: 'Jimma', attendeesCount: 2,
+      fullName: 'Amina Ahmed', phone: '+251911234567', email: 'amina@example.com', district: 'Jimma', attendeesCount: 2,
     })).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('rejects event registration without an email address', async () => {
+    mockRepository.findById.mockResolvedValue(event);
+
+    await expect(eventsService.registerForEvent(42, {
+      fullName: 'Amina Ahmed',
+      phone: '+251911234567',
+      district: 'Jimma',
+      attendeesCount: 1,
+    })).rejects.toMatchObject({ statusCode: 400 });
+    expect(mockRepository.register).not.toHaveBeenCalled();
+    expect(mockQueueRegistrationConfirmation).not.toHaveBeenCalled();
   });
 
   it('rejects an email already registered for the same event', async () => {
@@ -336,12 +353,40 @@ describe('Events request validation', () => {
     expect(createEventSchema.safeParse({ body: { ...requiredEvent, date: '2026-02-30' } }).success).toBe(false);
   });
 
-  it('rejects registrations with invalid phone numbers or seat counts', () => {
+  it('rejects registrations with invalid phone numbers, email addresses, or seat counts', () => {
     const result = registerForEventSchema.safeParse({
       params: { id: '42' },
-      body: { fullName: 'Amina Ahmed', phone: 'phone', district: 'Jimma', attendeesCount: 0 },
+      body: {
+        fullName: 'Amina Ahmed',
+        phone: 'phone',
+        email: 'amina@example.com',
+        district: 'Jimma',
+        attendeesCount: 0,
+      },
     });
     expect(result.success).toBe(false);
+  });
+
+  it('requires an email address for every event registration', () => {
+    expect(registerForEventSchema.safeParse({
+      params: { id: '42' },
+      body: {
+        fullName: 'Amina Ahmed',
+        phone: '+251911234567',
+        district: 'Jimma',
+        attendeesCount: 1,
+      },
+    }).success).toBe(false);
+    expect(registerForEventSchema.safeParse({
+      params: { id: '42' },
+      body: {
+        fullName: 'Amina Ahmed',
+        phone: '+251911234567',
+        email: '',
+        district: 'Jimma',
+        attendeesCount: 1,
+      },
+    }).success).toBe(false);
   });
 
   it('normalizes registration emails and validates pass lookup contacts', () => {

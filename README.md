@@ -101,19 +101,36 @@ announcement write permission can inspect the outbox at
 configuration.
 
 Published events and announcements are queued to the configured Telegram
-channel. Confirmed registrations are emailed when an address is provided.
+channel. Event registration requires a valid email address; confirmation
+emails are queued when a free registration is confirmed and after a paid
+registration's payment is approved.
 Event reminders and urgent announcements are delivered by email only after
 the subscriber verifies their address. The BullMQ worker scans the database
 outbox for due records every 15 seconds, retries provider failures, and marks
 final delivery status in the outbox.
 
-Configure `GMAIL_SMTP_USER` and `GMAIL_APP_PASSWORD` with a Gmail account and
-its Google App Password; `EMAIL_FROM_ADDRESS` is optional and defaults to that
-Gmail address. Store the App Password only in the backend `.env` (never in
-frontend config, source, logs, or chat). Subscribers receive a time-limited
-verification link before subscription email is used. For remote browser push, configure
-`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`; generate a key
-pair with `npx web-push generate-vapid-keys`. For Telegram, configure
+Configure email delivery in one of two supported ways:
+
+- Gmail API over HTTPS (recommended when SMTP is blocked): enable the Gmail API
+  in the Google Cloud project, create OAuth credentials, and set
+  `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, and
+  `GMAIL_OAUTH2_USER` in the backend `.env`. The refresh token must include the
+  `https://www.googleapis.com/auth/gmail.send` scope. This sends through the
+  Gmail API and does not use SMTP port 587.
+- Gmail SMTP app-password flow: set `GMAIL_SMTP_USER` and
+  `GMAIL_APP_PASSWORD`. This uses outbound TCP 587 to `smtp.gmail.com`.
+
+When any Gmail OAuth setting is present, delivery uses the Gmail API and reports
+incomplete OAuth configuration explicitly rather than falling back to SMTP.
+`EMAIL_FROM_ADDRESS` is optional and defaults to the authenticated Gmail
+address; a custom From address must be configured as a Gmail send-as alias.
+Store secrets only in the backend `.env` (never in frontend config, source,
+logs, or chat).
+
+Subscribers receive a time-limited verification link before subscription email
+is used. For remote browser push, configure `VAPID_PUBLIC_KEY`,
+`VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`; generate a key pair with
+`npx web-push generate-vapid-keys`. For Telegram, configure
 `TELEGRAM_BOT_TOKEN` and (if needed) `TELEGRAM_CHANNEL_ID`; the default target
 is `@riho_information` (`t.me/riho_information`). The bot must be added to that
 channel with permission to post. SMS is intentionally disabled until gateway
@@ -131,9 +148,10 @@ the paginated, persisted send history. Apply the
 the gateway history changes. SMS and guardian-specific Sabaq messages remain
 disabled.
 
-To verify Gmail SMTP from the backend host's network, run
-`npm run test:email -- recipient@example.com`. This sends one test message;
-use an environment/network that permits outbound TCP 587 to `smtp.gmail.com`.
+To verify email delivery, run `npm run test:email -- recipient@example.com`.
+This sends one real test message. With Gmail OAuth configured, it uses the
+Gmail API over HTTPS; otherwise it uses Gmail SMTP and requires outbound TCP
+587 to `smtp.gmail.com`.
 
 The Council Document Archive is admin-only and stores files as authenticated
 Cloudinary assets. Set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and

@@ -183,8 +183,8 @@ export async function registerForEvent(eventId, data, receiptFile) {
   if (!event || !event.isPublished || !event.registrationOpen || event.status === 'Cancelled') {
     throw new NotFoundError('Event not found or registration is closed');
   }
-  if (event.isPaid && !registrationData.email) {
-    throw new BadRequestError('An email address is required for paid event registration');
+  if (!registrationData.email) {
+    throw new BadRequestError('An email address is required for event registration');
   }
   if (event.isPaid && !receiptFile) {
     throw new BadRequestError('Attach your payment receipt to submit a paid event registration');

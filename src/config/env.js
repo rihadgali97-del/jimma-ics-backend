@@ -41,6 +41,13 @@ const envSchema = z.object({
     z.string().email().optional()
   ),
   GMAIL_APP_PASSWORD: z.string().optional(),
+  GMAIL_CLIENT_ID: z.string().optional(),
+  GMAIL_CLIENT_SECRET: z.string().optional(),
+  GMAIL_REFRESH_TOKEN: z.string().optional(),
+  GMAIL_OAUTH2_USER: z.preprocess(
+    (value) => value === '' ? undefined : value,
+    z.string().email().optional()
+  ),
   EMAIL_FROM_ADDRESS: z.string().optional(),
   WEB_APP_URL: z.string().url().default('http://localhost:3000'),
   VAPID_PUBLIC_KEY: z.string().optional(),

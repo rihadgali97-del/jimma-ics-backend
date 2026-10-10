@@ -96,7 +96,7 @@ export const registerForEventSchema = z.object({
   body: z.object({
     fullName: z.string().trim().min(2).max(180),
     phone: z.string().trim().regex(/^[0-9+()\-\s]{7,30}$/),
-    email: z.string().trim().email().max(255).transform((value) => value.toLowerCase()).optional().or(z.literal('')),
+    email: z.string().trim().email().max(255).transform((value) => value.toLowerCase()),
     district: z.string().trim().min(1).max(150),
     organizationOrMadrasa: z.string().trim().max(200).optional(),
     attendeesCount: z.coerce.number().int().positive().max(100),
