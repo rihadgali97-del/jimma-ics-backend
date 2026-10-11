@@ -14,9 +14,8 @@ const trackLimiter = strictRateLimiter({ windowMs: 15 * 60 * 1000, max: 30 });
  *   get:
  *     summary: Track any application/request by its reference number, regardless of service
  *     description: >
- *       Resolves the reference number's prefix (ZKT for Zakat, JNZ for Janazah)
- *       and returns that service's status view. A single tracker endpoint for
- *       the whole site instead of one per service.
+ *       Resolves the reference number's prefix (ZKT, JNZ, or INQ) and returns
+ *       that service's safe status view. Requires the phone used when submitting.
  *     tags: [Tracker]
  *     parameters:
  *       - in: path

@@ -1,6 +1,7 @@
 import { serviceCodeFromReference, SERVICE_CODES } from '../../common/services/referenceNumber.service.js';
 import { trackZakatApplication } from '../zakat/zakat.service.js';
 import { trackJanazahRequest } from '../janazah/janazah.service.js';
+import { trackOfficialInquiry } from '../official-inquiries/official-inquiries.service.js';
 import { BadRequestError } from '../../common/errors/httpErrors.js';
 
 // A single public entry point ("Track my application") that figures out
@@ -18,6 +19,11 @@ export async function trackByReference(reference, phone) {
   if (serviceCode === SERVICE_CODES.janazah) {
     const result = await trackJanazahRequest(reference, phone);
     return { service: 'janazah', ...result };
+  }
+
+  if (reference.toUpperCase().startsWith('INQ-')) {
+    const result = await trackOfficialInquiry(reference, phone);
+    return { service: 'official_inquiry', ...result };
   }
 
   throw new BadRequestError('Unrecognized reference number format');

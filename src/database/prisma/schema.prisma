@@ -169,7 +169,7 @@ model CouncilEvent {
   entryFee         String?             @map("entry_fee") @db.VarChar(100)
   isPaid           Boolean             @default(false) @map("is_paid")
   feeAmount        Decimal             @default(0) @map("fee_amount") @db.Decimal(12, 2)
-  paymentInstructions String?          @map("payment_instructions") @db.Text
+  paymentInstructions String?             @map("payment_instructions") @db.Text
   targetAudience   String?             @map("target_audience") @db.VarChar(500)
   livestreamUrl    String?             @map("livestream_url") @db.VarChar(1000)
   contactPhone     String?             @map("contact_phone") @db.VarChar(30)
@@ -594,6 +594,13 @@ enum ApplicationStatus {
   CANCELLED
 }
 
+enum OfficialInquiryStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
 // Atomic per-service, per-year counter backing human-readable reference
 // numbers like "NIK-2026-00042". See common/services/referenceNumber.service.js.
 model ReferenceSequence {
@@ -667,6 +674,23 @@ model JanazahRequest {
   @@index([woredaId])
   @@index([status])
   @@map("janazah_requests")
+}
+
+model OfficialInquiry {
+  id              Int                   @id @default(autoincrement())
+  referenceNumber String                @unique @map("reference_number") @db.VarChar(60)
+  status          OfficialInquiryStatus @default(SUBMITTED)
+  fullName        String                @map("full_name") @db.VarChar(150)
+  phone           String                @db.VarChar(30)
+  email           String?               @db.VarChar(255)
+  inquiryType     String                @map("inquiry_type") @db.VarChar(40)
+  department      String                @db.VarChar(100)
+  message         String                @db.Text
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@map("official_inquiries")
 }
 
 model CemeteryPlot {

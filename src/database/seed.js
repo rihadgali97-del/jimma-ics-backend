@@ -35,6 +35,7 @@ const PERMISSIONS = [
   'leadership.write',
   'dashboard.view',
   'translations.write',
+  'official_inquiries.manage',
 ];
 
 // 18 Woredas mentioned in the frontend README. Names/translations are
@@ -75,6 +76,7 @@ async function seedRolePermissions(roleRecords, permissionRecords) {
     secretariat_admin: [
       'announcements.write', 'announcements.broadcast', 'events.write',
       'documents.write', 'leadership.write', 'dashboard.view', 'translations.write',
+      'official_inquiries.manage',
     ],
     case_officer: ['zakat.manage', 'janazah.manage', 'cemetery_plots.write', 'dashboard.view'],
     finance_officer: ['finance.write', 'waqf.write', 'zakat.rates.write', 'dashboard.view'],

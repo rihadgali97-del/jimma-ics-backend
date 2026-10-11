@@ -34,6 +34,10 @@ import {
   notificationsAdminRouter,
 } from '../modules/notifications/notifications.routes.js';
 import { systemSettingsAdminRouter } from '../modules/system-settings/system-settings.routes.js';
+import {
+  officialInquiriesPublicRouter,
+  officialInquiriesAdminRouter,
+} from '../modules/official-inquiries/official-inquiries.routes.js';
 
 export const apiRouter = Router();
 
@@ -88,6 +92,8 @@ apiRouter.use('/admin/events', eventsAdminRouter);
 //apiRouter.use('/admin/events', eventsAdminRouter);
 apiRouter.use('/notifications', notificationsPublicRouter);
 apiRouter.use('/admin/notifications', notificationsAdminRouter);
+apiRouter.use('/official-inquiries', officialInquiriesPublicRouter);
+apiRouter.use('/admin/official-inquiries', officialInquiriesAdminRouter);
 apiRouter.use('/admin/system-settings', systemSettingsAdminRouter);
 apiRouter.use('/fatwas', fatwasPublicRouter);
 apiRouter.use('/admin/fatwas', fatwasAdminRouter);
