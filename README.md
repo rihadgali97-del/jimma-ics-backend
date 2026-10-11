@@ -132,6 +132,13 @@ address; a custom From address must be configured as a Gmail send-as alias.
 Store secrets only in the backend `.env` (never in frontend config, source,
 logs, or chat).
 
+Staff account requests require a verified email before an administrator can
+assign a role. Until an administrator assigns a role, the account cannot sign
+in; administrators can reject requests from the Staff & Roles page. Apply the
+database migration with `npm run prisma:migrate:deploy` before deploying this
+flow, and configure one of the email providers above to deliver verification
+links.
+
 Subscribers receive a time-limited verification link before subscription email
 is used. For remote browser push, configure `VAPID_PUBLIC_KEY`,
 `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`; generate a key pair with

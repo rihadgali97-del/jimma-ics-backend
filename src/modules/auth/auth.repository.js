@@ -73,4 +73,32 @@ export const authRepository = {
   updateUserPassword(userId, passwordHash) {
     return prisma.user.update({ where: { id: userId }, data: { passwordHash } });
   },
+
+  findEmailVerificationTokenByHash(tokenHash) {
+    return prisma.emailVerificationToken.findUnique({ where: { tokenHash } });
+  },
+
+  saveEmailVerificationToken(userId, tokenHash, expiresAt) {
+    return prisma.emailVerificationToken.upsert({
+      where: { userId },
+      create: { userId, tokenHash, expiresAt },
+      update: { tokenHash, expiresAt, usedAt: null, createdAt: new Date() },
+    });
+  },
+
+  async consumeEmailVerificationToken(tokenHash, userId) {
+    return prisma.$transaction(async (transaction) => {
+      const result = await transaction.emailVerificationToken.updateMany({
+        where: { userId, tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
+        data: { usedAt: new Date() },
+      });
+      if (result.count !== 1) return false;
+
+      await transaction.user.update({
+        where: { id: userId },
+        data: { emailVerified: true },
+      });
+      return true;
+    });
+  },
 };

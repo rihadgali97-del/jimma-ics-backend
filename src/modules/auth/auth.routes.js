@@ -7,6 +7,8 @@ import {
   logoutSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  verifyEmailSchema,
+  resendEmailVerificationSchema,
 } from './auth.validation.js';
 import { validate } from '../../common/middlewares/validate.js';
 import { authenticate } from '../../common/middlewares/authenticate.js';
@@ -17,6 +19,7 @@ export const authRouter = Router();
 const loginLimiter = strictRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
 const registerLimiter = strictRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 });
 const forgotPasswordLimiter = strictRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 });
+const verifyEmailLimiter = strictRateLimiter({ windowMs: 60 * 60 * 1000, max: 12 });
 
 /**
  * @openapi
@@ -42,8 +45,15 @@ const forgotPasswordLimiter = strictRateLimiter({ windowMs: 60 * 60 * 1000, max:
  */
 authRouter.post('/login', loginLimiter, validate(loginSchema), authController.login);
 
-/** Public registration creates an active account with the no-permission pending_staff role. */
+/** Public registration creates an unverified account with no staff permissions. */
 authRouter.post('/register', registerLimiter, validate(registerSchema), authController.register);
+authRouter.post('/verify-email', verifyEmailLimiter, validate(verifyEmailSchema), authController.verifyEmail);
+authRouter.post(
+  '/resend-verification',
+  verifyEmailLimiter,
+  validate(resendEmailVerificationSchema),
+  authController.resendEmailVerification
+);
 
 /**
  * @openapi

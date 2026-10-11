@@ -221,8 +221,15 @@ function escapeHtml(value) {
 
 function notificationHtml(message) {
   const text = notificationText(message);
-  const content = text.split('\n').map((line) => `<p>${escapeHtml(line)}</p>`).join('');
-  return `<div style="font-family:Arial,sans-serif;line-height:1.5">${content}</div>`;
+  const content = text
+    .split('\n')
+    .filter((line) => !message.verificationUrl || line !== `Verify your email: ${message.verificationUrl}`)
+    .map((line) => `<p>${escapeHtml(line)}</p>`)
+    .join('');
+  const verificationLink = message.verificationUrl
+    ? `<p><a href="${escapeHtml(message.verificationUrl)}">Verify your email address</a></p>`
+    : '';
+  return `<div style="font-family:Arial,sans-serif;line-height:1.5">${content}${verificationLink}</div>`;
 }
 
 function eventRegistrationHtml(message) {

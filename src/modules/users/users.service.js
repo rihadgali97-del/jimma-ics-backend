@@ -15,6 +15,7 @@ function toPublicUser(user) {
     email: user.email,
     phone: user.phone,
     isActive: user.isActive,
+    emailVerified: user.emailVerified,
     role: {
       id: user.role.id,
       name: user.role.name,
@@ -90,15 +91,24 @@ export async function updateUser(id, changes, actorId) {
   if (changes.roleId) {
     const role = await usersRepository.findRoleById(changes.roleId);
     if (!role) throw new BadRequestError('roleId does not reference an existing role');
+    if (existing.role.name === 'pending_staff' && role.name !== 'pending_staff' && !existing.emailVerified) {
+      throw new ConflictError('Verify the account email before assigning staff access');
+    }
   }
 
   const wasDeactivated = changes.isActive === false && existing.isActive === true;
+  const isApproval = Boolean(changes.roleId && existing.role.name === 'pending_staff');
+  const metadata = changes.metadata !== undefined || isApproval
+    ? {
+        ...(existing.metadata || {}),
+        ...(changes.metadata || {}),
+        ...(isApproval ? { approvalStatus: 'approved' } : {}),
+      }
+    : undefined;
 
   const updated = await usersRepository.update(id, {
     ...changes,
-    ...(changes.metadata !== undefined
-      ? { metadata: { ...(existing.metadata || {}), ...changes.metadata } }
-      : {}),
+    ...(metadata !== undefined ? { metadata } : {}),
   });
 
   // Deactivating an account must also kill any live sessions immediately —

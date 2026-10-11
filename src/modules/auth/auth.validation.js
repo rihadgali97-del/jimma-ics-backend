@@ -22,6 +22,18 @@ export const registerSchema = z.object({
   }),
 });
 
+export const verifyEmailSchema = z.object({
+  body: z.object({
+    token: z.string().min(1, 'token is required'),
+  }),
+});
+
+export const resendEmailVerificationSchema = z.object({
+  body: z.object({
+    email: z.string().trim().email().transform((value) => value.toLowerCase()),
+  }),
+});
+
 export const refreshSchema = z.object({
   body: z.object({
     refreshToken: z.string().min(1, 'refreshToken is required'),

@@ -25,6 +25,12 @@ const mockPrisma = {
     findUnique: jest.fn(),
     update: jest.fn(),
   },
+  emailVerificationToken: {
+    findUnique: jest.fn(),
+    upsert: jest.fn(),
+    updateMany: jest.fn(),
+  },
+  $transaction: jest.fn(),
   role: {
     findUnique: jest.fn(),
   },
@@ -61,6 +67,10 @@ beforeAll(async () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockPrisma.$transaction.mockImplementation((callback) => callback({
+    emailVerificationToken: { updateMany: mockPrisma.emailVerificationToken.updateMany },
+    user: { update: mockPrisma.user.update },
+  }));
 });
 
 describe('POST /api/v1/auth/login', () => {
@@ -124,6 +134,33 @@ describe('POST /api/v1/auth/login', () => {
 
     expect(res.status).toBe(401);
   });
+
+  it('rejects an unverified email even when credentials are correct', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ ...TEST_USER, emailVerified: false });
+
+    const app = createApp();
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: TEST_USER.email, password: 'correct-password-123' });
+
+    expect(res.status).toBe(401);
+    expect(res.body.error.message).toMatch(/verify your email/i);
+  });
+
+  it('rejects a user without an administrator-assigned role', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      ...TEST_USER,
+      role: { id: 2, name: 'pending_staff' },
+    });
+
+    const app = createApp();
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: TEST_USER.email, password: 'correct-password-123' });
+
+    expect(res.status).toBe(401);
+    expect(res.body.error.message).toMatch(/administrator approval/i);
+  });
 });
 
 describe('GET /api/v1/auth/me', () => {
@@ -151,6 +188,51 @@ describe('POST /api/v1/auth/register', () => {
   beforeEach(() => {
     mockPrisma.user.findUnique.mockResolvedValue(null);
     mockPrisma.role.findUnique.mockResolvedValue({ id: 2, name: 'pending_staff' });
+  });
+
+  describe('POST /api/v1/auth/verify-email', () => {
+    it('verifies an email and consumes the token once', async () => {
+      mockPrisma.emailVerificationToken.findUnique.mockResolvedValue({
+        id: 4,
+        userId: 8,
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+      mockPrisma.emailVerificationToken.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.user.update.mockResolvedValue({ id: 8, emailVerified: true });
+      mockPrisma.auditLog.create.mockResolvedValue({ id: 1 });
+
+      const app = createApp();
+      const res = await request(app)
+        .post('/api/v1/auth/verify-email')
+        .send({ token: 'valid-verification-token' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual({
+        emailVerified: true,
+        awaitingAdministratorApproval: true,
+      });
+      expect(mockPrisma.emailVerificationToken.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ userId: 8, usedAt: null }),
+      }));
+    });
+
+    it('rejects an expired verification token', async () => {
+      mockPrisma.emailVerificationToken.findUnique.mockResolvedValue({
+        id: 4,
+        userId: 8,
+        usedAt: null,
+        expiresAt: new Date(Date.now() - 60_000),
+      });
+
+      const app = createApp();
+      const res = await request(app)
+        .post('/api/v1/auth/verify-email')
+        .send({ token: 'expired-verification-token' });
+
+      expect(res.status).toBe(401);
+      expect(mockPrisma.emailVerificationToken.updateMany).not.toHaveBeenCalled();
+    });
   });
 
   it('reports when the phone number is already in use', async () => {

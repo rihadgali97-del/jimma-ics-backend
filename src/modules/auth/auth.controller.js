@@ -44,3 +44,15 @@ export const register = asyncHandler(async (req, res) => {
   const result = await authService.register(req.body);
   sendSuccess(res, { data: result, statusCode: 201 });
 });
+
+export const verifyEmail = asyncHandler(async (req, res) => {
+  const result = await authService.verifyEmail(req.body.token);
+  sendSuccess(res, { data: result });
+});
+
+export const resendEmailVerification = asyncHandler(async (req, res) => {
+  await authService.resendEmailVerification(req.body.email);
+  sendSuccess(res, {
+    data: { message: 'If this account needs verification, a verification email has been sent.' },
+  });
+});

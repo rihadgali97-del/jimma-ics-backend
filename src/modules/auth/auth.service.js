@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { URL } from 'node:url';
 import { authRepository } from './auth.repository.js';
 import { verifyPassword, hashPassword } from '../../common/utils/password.js';
 import { sha256Hex, randomToken } from '../../common/utils/hash.js';
@@ -8,6 +9,7 @@ import { writeAuditLog } from '../../common/utils/auditLog.js';
 import { logger } from '../../common/utils/logger.js';
 import { env } from '../../config/env.js';
 import { expandPermissionAliases } from '../../common/utils/permissionAliases.js';
+import { sendEmail } from '../../common/services/notifications/providers/email.provider.js';
 
 const REFRESH_TOKEN_TTL_MS = env.JWT_REFRESH_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000;
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -18,6 +20,7 @@ function toPublicUser(user) {
     fullName: user.fullName,
     email: user.email,
     phone: user.phone,
+    emailVerified: user.emailVerified,
     role: user.role.name,
     roleId: user.roleId,
     permissions: expandPermissionAliases([
@@ -56,6 +59,12 @@ export async function login({ email, password, ip }) {
   if (!passwordMatches) {
     throw new UnauthorizedError('Invalid email or password');
   }
+  if (user.emailVerified === false) {
+    throw new UnauthorizedError('Verify your email address before signing in');
+  }
+  if (user.role.name === 'pending_staff') {
+    throw new UnauthorizedError('Your account is awaiting administrator approval');
+  }
 
   await authRepository.touchLastLogin(user.id);
   const tokens = await issueTokenPair(user, ip);
@@ -90,7 +99,7 @@ export async function refresh({ refreshToken, ip }) {
   }
 
   const user = await authRepository.findUserById(stored.userId);
-  if (!user || !user.isActive) {
+  if (!user || !user.isActive || user.emailVerified === false || user.role.name === 'pending_staff') {
     throw new UnauthorizedError('Account is inactive or no longer exists');
   }
 
@@ -180,6 +189,7 @@ export async function register({ fullName, email, phone, password }) {
       passwordHash: await hashPassword(password),
       roleId: pendingRole.id,
       isActive: true,
+      emailVerified: false,
     });
   } catch (err) {
     if (err.code === 'P2002') {
@@ -206,5 +216,63 @@ export async function register({ fullName, email, phone, password }) {
     entityId: user.id,
   });
 
-  return { accountCreated: true, awaitingRoleAssignment: true, user: toPublicUser(user) };
+  await sendEmailVerification(user);
+
+  return {
+    accountCreated: true,
+    emailVerificationRequired: true,
+    awaitingRoleAssignment: true,
+    user: toPublicUser(user),
+  };
+}
+
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function sendEmailVerification(user) {
+  const rawToken = randomToken(32);
+  await authRepository.saveEmailVerificationToken(
+    user.id,
+    sha256Hex(rawToken),
+    new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS)
+  );
+
+  const verificationUrl = new URL('/login', env.WEB_APP_URL);
+  verificationUrl.searchParams.set('verifyEmail', rawToken);
+
+  await sendEmail(user.email, {
+    subject: 'Verify your Jimma Islamic Council staff account',
+    title: 'Verify your email address',
+    summary: 'Confirm your email address to continue with your staff account request.',
+    verificationUrl: verificationUrl.toString(),
+  });
+}
+
+export async function verifyEmail(token) {
+  const tokenHash = sha256Hex(token);
+  const stored = await authRepository.findEmailVerificationTokenByHash(tokenHash);
+  const isValid = stored && !stored.usedAt && stored.expiresAt > new Date();
+  if (!isValid) {
+    throw new UnauthorizedError('Email verification link is invalid or has expired');
+  }
+
+  const verified = await authRepository.consumeEmailVerificationToken(tokenHash, stored.userId);
+  if (!verified) {
+    throw new UnauthorizedError('Email verification link is invalid or has expired');
+  }
+
+  await writeAuditLog({
+    actorId: stored.userId,
+    action: 'verify_email',
+    entityType: 'user',
+    entityId: stored.userId,
+  });
+
+  return { emailVerified: true, awaitingAdministratorApproval: true };
+}
+
+export async function resendEmailVerification(email) {
+  const user = await authRepository.findActiveUserByEmail(email);
+  if (user && user.isActive && user.emailVerified === false) {
+    await sendEmailVerification(user);
+  }
 }

@@ -58,6 +58,26 @@ describe('Notification delivery providers', () => {
     expect(result).toEqual({ messageId: 'test-message' });
   });
 
+  it('renders email verification URLs as links', async () => {
+    env.GMAIL_SMTP_USER = 'sender@gmail.com';
+    env.GMAIL_APP_PASSWORD = 'test app password';
+    env.GMAIL_CLIENT_ID = undefined;
+    env.GMAIL_CLIENT_SECRET = undefined;
+    env.GMAIL_REFRESH_TOKEN = undefined;
+    env.GMAIL_OAUTH2_USER = undefined;
+    const sendMail = jest.fn().mockResolvedValue({ messageId: 'verification-message' });
+    jest.spyOn(nodemailer, 'createTransport').mockReturnValue({ sendMail, close: jest.fn() });
+
+    await sendEmail('person@example.org', {
+      title: 'Verify your email address',
+      verificationUrl: 'https://council.example.org/login?verifyEmail=abc123',
+    });
+
+    expect(sendMail.mock.calls[0][0].html).toContain(
+      'href="https://council.example.org/login?verifyEmail=abc123"'
+    );
+  });
+
   it('emails event registrants an inline and downloadable QR pass', async () => {
     env.GMAIL_SMTP_USER = 'sender@gmail.com';
     env.GMAIL_APP_PASSWORD = 'test app password';
