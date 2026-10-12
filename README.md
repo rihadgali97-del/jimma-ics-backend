@@ -51,10 +51,20 @@ src/
 
 ## With Docker Compose
 
-1. Copy `.env.example` to `.env` and fill in secrets.
-2. `docker compose up --build`
+1. Copy `.env.example` to `.env` and replace every placeholder, including
+   `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD`, and both JWT secrets. Use distinct,
+   strong random values. Compose will not start if either database password
+   is missing.
+2. `docker compose up --build`. MySQL and Redis are available only to the
+   Compose network; only the API port is published. Set `PORT` in `.env` to
+   choose the host port for the API (the container listens on port 4000).
 3. The `app` service runs `prisma migrate deploy` automatically on start, then boots the API.
 4. Seed manually once containers are up: `docker compose exec app npm run seed`
+
+For a production frontend build, set `VITE_API_BASE_URL` to the public HTTPS
+API URL (for example, `https://api.example.org/api/v1`) before running
+`npm run build`. Production frontend bundles intentionally fail fast if this
+value is missing or does not use HTTPS.
 
 ## Testing
 

@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   app:
     build:
@@ -12,7 +10,8 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: mysql://jimma_ics:${MYSQL_PASSWORD:-changeme}@mysql:3306/jimma_ics
+      PORT: 4000
+      DATABASE_URL: mysql://jimma_ics:${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}@mysql:3306/jimma_ics
       REDIS_URL: redis://redis:6379
     depends_on:
       mysql:
@@ -21,7 +20,7 @@ services:
         condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
-    command: sh -c "npx prisma migrate deploy && node src/server.js"
+    command: sh -c "npm run prisma:migrate:deploy && node src/server.js"
 
   mysql:
     image: mysql:8.0
@@ -30,10 +29,8 @@ services:
     environment:
       MYSQL_DATABASE: jimma_ics
       MYSQL_USER: jimma_ics
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-changeme}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-changeme_root}
-    ports:
-      - '3306:3306'
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -46,8 +43,6 @@ services:
     image: redis:7-alpine
     container_name: jimma_ics_redis
     restart: unless-stopped
-    ports:
-      - '6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:

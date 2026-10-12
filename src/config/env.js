@@ -5,7 +5,7 @@ import { z } from 'zod';
 // never fall back to hardcoded secrets/defaults in production.
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().positive().default(7000),
+  PORT: z.coerce.number().int().positive().default(4000),
   API_PREFIX: z.string().default('/api/v1'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),

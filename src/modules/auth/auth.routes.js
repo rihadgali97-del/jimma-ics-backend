@@ -20,6 +20,7 @@ const loginLimiter = strictRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
 const registerLimiter = strictRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 });
 const forgotPasswordLimiter = strictRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 });
 const verifyEmailLimiter = strictRateLimiter({ windowMs: 60 * 60 * 1000, max: 12 });
+const resetPasswordLimiter = strictRateLimiter({ windowMs: 60 * 60 * 1000, max: 10 });
 
 /**
  * @openapi
@@ -162,4 +163,9 @@ authRouter.post(
  *       401:
  *         description: Token invalid or expired
  */
-authRouter.post('/reset-password', validate(resetPasswordSchema), authController.resetPassword);
+authRouter.post(
+  '/reset-password',
+  resetPasswordLimiter,
+  validate(resetPasswordSchema),
+  authController.resetPassword
+);

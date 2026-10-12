@@ -39,10 +39,16 @@ const mockPrisma = {
   },
 };
 
+const mockSendEmail = jest.fn().mockResolvedValue({ messageId: 'test-message-id' });
+
 jest.unstable_mockModule('../src/config/database.js', () => ({
   prisma: mockPrisma,
   connectDatabase: jest.fn(),
   disconnectDatabase: jest.fn(),
+}));
+
+jest.unstable_mockModule('../src/common/services/notifications/providers/email.provider.js', () => ({
+  sendEmail: mockSendEmail,
 }));
 
 // app.js -> routes -> auth/users modules all resolve to the mock above once
@@ -273,6 +279,65 @@ describe('POST /api/v1/auth/forgot-password', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.message).toMatch(/reset link/i);
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it('emails an expiring reset link to an existing active account', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue(TEST_USER);
+    mockPrisma.passwordResetToken.create.mockResolvedValue({ id: 2 });
+
+    const app = createApp();
+    const res = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: TEST_USER.email });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.message).toMatch(/reset link/i);
+    expect(mockPrisma.passwordResetToken.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        userId: TEST_USER.id,
+        expiresAt: expect.any(Date),
+      }),
+    }));
+    expect(mockSendEmail).toHaveBeenCalledWith(TEST_USER.email, expect.objectContaining({
+      subject: expect.stringMatching(/reset/i),
+      linkLabel: 'Reset your password',
+      verificationUrl: expect.stringMatching(/\/login\?resetPassword=/),
+    }));
+  });
+});
+
+describe('POST /api/v1/auth/reset-password', () => {
+  it('updates the password and revokes existing refresh tokens', async () => {
+    mockPrisma.passwordResetToken.findUnique.mockResolvedValue({
+      id: 3,
+      userId: TEST_USER.id,
+      usedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    mockPrisma.passwordResetToken.update.mockResolvedValue({ id: 3 });
+    mockPrisma.user.update.mockResolvedValue({ id: TEST_USER.id });
+    mockPrisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.auditLog.create.mockResolvedValue({ id: 1 });
+
+    const app = createApp();
+    const res = await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({ token: 'valid-reset-token', newPassword: 'a-new-password-123' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ passwordReset: true });
+    expect(mockPrisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: TEST_USER.id },
+      data: { passwordHash: expect.any(String) },
+    }));
+    expect(mockPrisma.passwordResetToken.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 3 },
+      data: { usedAt: expect.any(Date) },
+    }));
+    expect(mockPrisma.refreshToken.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId: TEST_USER.id, revokedAt: null },
+    }));
   });
 });
 

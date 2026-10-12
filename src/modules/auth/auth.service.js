@@ -6,7 +6,6 @@ import { sha256Hex, randomToken } from '../../common/utils/hash.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../common/utils/jwt.js';
 import { UnauthorizedError, NotFoundError, ConflictError, BadRequestError } from '../../common/errors/httpErrors.js';
 import { writeAuditLog } from '../../common/utils/auditLog.js';
-import { logger } from '../../common/utils/logger.js';
 import { env } from '../../config/env.js';
 import { expandPermissionAliases } from '../../common/utils/permissionAliases.js';
 import { sendEmail } from '../../common/services/notifications/providers/email.provider.js';
@@ -138,13 +137,16 @@ export async function forgotPassword({ email }) {
     expiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
   });
 
-  // TODO(Phase 6 - Notifications module): dispatch this via email instead of
-  // logging it. Until then, an operator can read it from server logs to
-  // manually relay a reset link during Phase 1-5 development/staging.
-  logger.info(
-    { userId: user.id, rawToken },
-    'Password reset token issued — email dispatch pending Phase 6'
-  );
+  const resetUrl = new URL('/login', env.WEB_APP_URL);
+  resetUrl.searchParams.set('resetPassword', rawToken);
+
+  await sendEmail(user.email, {
+    subject: 'Reset your Jimma Islamic Council password',
+    title: 'Reset your password',
+    summary: 'Use the secure link below to choose a new password. This link expires in one hour.',
+    linkLabel: 'Reset your password',
+    verificationUrl: resetUrl.toString(),
+  });
 }
 
 export async function resetPassword({ token, newPassword }) {

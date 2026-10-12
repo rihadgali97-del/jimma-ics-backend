@@ -205,7 +205,7 @@ function notificationText(message) {
     message.passNumber && `Pass number: ${message.passNumber}`,
     message.attendeesCount && `Seats reserved: ${message.attendeesCount}`,
     message.notificationType === 'EVENT_REGISTRATION' && 'Your downloadable QR pass is attached as a PNG image.',
-    message.verificationUrl && `Verify your email: ${message.verificationUrl}`,
+    message.verificationUrl && `${message.linkLabel || 'Verify your email'}: ${message.verificationUrl}`,
   ].filter(Boolean).join('\n\n');
 }
 
@@ -227,7 +227,7 @@ function notificationHtml(message) {
     .map((line) => `<p>${escapeHtml(line)}</p>`)
     .join('');
   const verificationLink = message.verificationUrl
-    ? `<p><a href="${escapeHtml(message.verificationUrl)}">Verify your email address</a></p>`
+    ? `<p><a href="${escapeHtml(message.verificationUrl)}">${escapeHtml(message.linkLabel || 'Verify your email address')}</a></p>`
     : '';
   return `<div style="font-family:Arial,sans-serif;line-height:1.5">${content}${verificationLink}</div>`;
 }

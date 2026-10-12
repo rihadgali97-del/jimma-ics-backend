@@ -48,7 +48,7 @@ export const logoutSchema = z.object({
 
 export const forgotPasswordSchema = z.object({
   body: z.object({
-    email: z.string().email(),
+    email: z.string().trim().email().transform((value) => value.toLowerCase()),
   }),
 });
 
