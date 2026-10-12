@@ -2,6 +2,7 @@ import { jest } from '@jest/globals';
 
 const mockRepository = {
   findMany: jest.fn(),
+  getOverview: jest.fn(),
   findById: jest.fn(),
   create: jest.fn(),
   update: jest.fn(),
@@ -75,6 +76,20 @@ const event = {
 beforeEach(() => jest.clearAllMocks());
 
 describe('Events service', () => {
+  it('returns persisted event KPI totals from the repository', async () => {
+    const overview = {
+      eventCount: 6,
+      totalCapacity: 4350,
+      openRegistrationEventCount: 5,
+      confirmedAttendeeCount: 3190,
+      checkedInAttendeeCount: 12,
+      issuedPassCount: 42,
+    };
+    mockRepository.getOverview.mockResolvedValue(overview);
+
+    await expect(eventsService.getEventOverview()).resolves.toEqual(overview);
+  });
+
   it('maps database events to the public event shape', async () => {
     mockRepository.findById.mockResolvedValue(event);
 

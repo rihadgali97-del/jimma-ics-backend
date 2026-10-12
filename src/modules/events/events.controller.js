@@ -24,6 +24,10 @@ export const listAdmin = asyncHandler(async (req, res) => {
   sendSuccess(res, { data: result.items, meta: result.meta });
 });
 
+export const getOverview = asyncHandler(async (_req, res) => {
+  sendSuccess(res, { data: await eventsService.getEventOverview() });
+});
+
 export const getAdmin = asyncHandler(async (req, res) => {
   sendSuccess(res, { data: await eventsService.getEvent(req.params.id, { publicOnly: false }) });
 });

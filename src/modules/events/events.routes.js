@@ -37,6 +37,7 @@ eventsPublicRouter.post(
 );
 
 eventsAdminRouter.use(authenticate, authorize('events.write'));
+eventsAdminRouter.get('/overview', eventsController.getOverview);
 eventsAdminRouter.get('/registrations', validate(listEventRegistrationsSchema), eventsController.listRegistrations);
 eventsAdminRouter.get('/registrations/:id/payment-receipt', validate(reviewEventPaymentSchema.pick({ params: true })), eventsController.getPaymentReceipt);
 eventsAdminRouter.patch('/registrations/:id/payment', validate(reviewEventPaymentSchema), eventsController.reviewPayment);

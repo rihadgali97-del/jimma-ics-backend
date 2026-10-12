@@ -96,6 +96,10 @@ export async function listEvents(query, { publicOnly = true } = {}) {
   return { items: items.map(toCouncilEvent), meta: buildPaginationMeta({ page, pageSize, totalItems }) };
 }
 
+export function getEventOverview() {
+  return eventsRepository.getOverview();
+}
+
 export async function getEvent(id, { publicOnly = true } = {}) {
   const event = await eventsRepository.findById(id);
   if (!event || (publicOnly && !event.isPublished)) throw new NotFoundError('Event not found');

@@ -24,6 +24,39 @@ export const eventsRepository = {
     return { items, totalItems };
   },
 
+  async getOverview() {
+    const [events, openEvents, confirmedAttendees, checkedInAttendees, issuedPasses] = await Promise.all([
+      prisma.councilEvent.aggregate({
+        _count: { _all: true },
+        _sum: { maxCapacity: true },
+      }),
+      prisma.councilEvent.count({ where: { registrationOpen: true } }),
+      prisma.eventRegistration.aggregate({
+        where: {
+          status: { not: 'CANCELLED' },
+          paymentStatus: { in: ['FREE', 'APPROVED'] },
+        },
+        _sum: { attendeesCount: true },
+      }),
+      prisma.eventRegistration.aggregate({
+        where: { status: 'CHECKED_IN' },
+        _sum: { attendeesCount: true },
+      }),
+      prisma.eventRegistration.count({
+        where: { status: { not: 'CANCELLED' }, passNumber: { not: null } },
+      }),
+    ]);
+
+    return {
+      eventCount: events._count._all,
+      totalCapacity: events._sum.maxCapacity ?? 0,
+      openRegistrationEventCount: openEvents,
+      confirmedAttendeeCount: confirmedAttendees._sum.attendeesCount ?? 0,
+      checkedInAttendeeCount: checkedInAttendees._sum.attendeesCount ?? 0,
+      issuedPassCount: issuedPasses,
+    };
+  },
+
   findById(id) {
     return prisma.councilEvent.findUnique({ where: { id } });
   },
