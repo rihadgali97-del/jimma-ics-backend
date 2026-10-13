@@ -61,6 +61,9 @@ export async function login({ email, password, ip }) {
   if (user.emailVerified === false) {
     throw new UnauthorizedError('Verify your email address before signing in');
   }
+  if (user.metadata?.forcePasswordReset === true) {
+    throw new UnauthorizedError('Reset your password using the link sent to your email before signing in');
+  }
   if (user.role.name === 'pending_staff') {
     throw new UnauthorizedError('Your account is awaiting administrator approval');
   }
@@ -98,7 +101,8 @@ export async function refresh({ refreshToken, ip }) {
   }
 
   const user = await authRepository.findUserById(stored.userId);
-  if (!user || !user.isActive || user.emailVerified === false || user.role.name === 'pending_staff') {
+  if (!user || !user.isActive || user.emailVerified === false || user.role.name === 'pending_staff'
+    || user.metadata?.forcePasswordReset === true) {
     throw new UnauthorizedError('Account is inactive or no longer exists');
   }
 
@@ -130,6 +134,10 @@ export async function forgotPassword({ email }) {
   // enumerate valid staff email addresses.
   if (!user || !user.isActive) return;
 
+  await sendPasswordResetEmail(user);
+}
+
+export async function sendPasswordResetEmail(user, initialSetup = false) {
   const rawToken = randomToken(32);
   await authRepository.createPasswordResetToken({
     userId: user.id,
@@ -141,10 +149,14 @@ export async function forgotPassword({ email }) {
   resetUrl.searchParams.set('resetPassword', rawToken);
 
   await sendEmail(user.email, {
-    subject: 'Reset your Jimma Islamic Council password',
-    title: 'Reset your password',
-    summary: 'Use the secure link below to choose a new password. This link expires in one hour.',
-    linkLabel: 'Reset your password',
+    subject: initialSetup
+      ? 'Set your Jimma Islamic Council staff password'
+      : 'Reset your Jimma Islamic Council password',
+    title: initialSetup ? 'Set your staff password' : 'Reset your password',
+    summary: initialSetup
+      ? 'An administrator created your staff account. Set a new password using the secure link below before signing in. This link expires in one hour.'
+      : 'Use the secure link below to choose a new password. This link expires in one hour.',
+    linkLabel: initialSetup ? 'Set your password' : 'Reset your password',
     verificationUrl: resetUrl.toString(),
   });
 }
@@ -158,9 +170,17 @@ export async function resetPassword({ token, newPassword }) {
     throw new UnauthorizedError('Password reset token is invalid or has expired');
   }
 
+  const user = await authRepository.findUserById(stored.userId);
+  if (!user) {
+    throw new UnauthorizedError('Password reset token is invalid or has expired');
+  }
   const passwordHash = await hashPassword(newPassword);
 
-  await authRepository.updateUserPassword(stored.userId, passwordHash);
+  const metadata = user.metadata && typeof user.metadata === 'object' && !Array.isArray(user.metadata)
+    ? { ...user.metadata }
+    : {};
+  delete metadata.forcePasswordReset;
+  await authRepository.updateUserPassword(stored.userId, passwordHash, metadata);
   await authRepository.markPasswordResetTokenUsed(stored.id);
   // Force re-login on every device after a password reset.
   await authRepository.revokeAllRefreshTokensForUser(stored.userId);

@@ -70,8 +70,11 @@ export const authRepository = {
     return prisma.passwordResetToken.update({ where: { id }, data: { usedAt: new Date() } });
   },
 
-  updateUserPassword(userId, passwordHash) {
-    return prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  updateUserPassword(userId, passwordHash, metadata) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash, metadata },
+    });
   },
 
   findEmailVerificationTokenByHash(tokenHash) {

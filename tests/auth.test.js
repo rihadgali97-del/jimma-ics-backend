@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import request from 'supertest';
 import argon2 from 'argon2';
 
@@ -54,6 +54,7 @@ jest.unstable_mockModule('../src/common/services/notifications/providers/email.p
 // app.js -> routes -> auth/users modules all resolve to the mock above once
 // imported dynamically *after* jest.unstable_mockModule is registered.
 const { createApp } = await import('../src/app.js');
+const { signAccessToken } = await import('../src/common/utils/jwt.js');
 
 const TEST_USER = {
   id: 1,
@@ -64,7 +65,7 @@ const TEST_USER = {
   isActive: true,
   roleId: 1,
   lastLoginAt: null,
-  role: { id: 1, name: 'super_admin' },
+  role: { id: 1, name: 'super_admin', permissions: [] },
 };
 
 beforeAll(async () => {
@@ -130,6 +131,22 @@ describe('POST /api/v1/auth/login', () => {
     expect(res.body.data.user.passwordHash).toBeUndefined();
   });
 
+  it('requires an administrator-created staff member to reset their initial password before login', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      ...TEST_USER,
+      metadata: { forcePasswordReset: true },
+    });
+
+    const app = createApp();
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: TEST_USER.email, password: 'correct-password-123' });
+
+    expect(res.status).toBe(401);
+    expect(res.body.error.message).toMatch(/reset your password/i);
+    expect(mockPrisma.refreshToken.create).not.toHaveBeenCalled();
+  });
+
   it('rejects an inactive account', async () => {
     mockPrisma.user.findUnique.mockResolvedValue({ ...TEST_USER, isActive: false });
 
@@ -166,6 +183,65 @@ describe('POST /api/v1/auth/login', () => {
 
     expect(res.status).toBe(401);
     expect(res.body.error.message).toMatch(/administrator approval/i);
+  });
+});
+
+describe('POST /api/v1/admin/users', () => {
+  it('sends the newly enrolled staff member a password setup link', async () => {
+    const createdUser = {
+      id: 88,
+      fullName: 'New Custom Role Staff',
+      email: 'new.staff@example.com',
+      phone: null,
+      isActive: true,
+      emailVerified: true,
+      roleId: 4,
+      lastLoginAt: null,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      metadata: { department: 'Finance & Endowment', forcePasswordReset: true },
+      role: {
+        id: 4,
+        name: 'event_reviewers',
+        permissions: [{ permission: { key: 'events.write' } }],
+      },
+    };
+    mockPrisma.user.findUnique
+      .mockResolvedValueOnce(TEST_USER)
+      .mockResolvedValueOnce(null);
+    mockPrisma.role.findUnique.mockResolvedValue({ id: 4, name: 'event_reviewers' });
+    mockPrisma.user.create.mockResolvedValue(createdUser);
+    mockPrisma.passwordResetToken.create.mockResolvedValue({ id: 9 });
+    mockPrisma.auditLog.create.mockResolvedValue({ id: 1 });
+
+    const app = createApp();
+    const res = await request(app)
+      .post('/api/v1/admin/users')
+      .set('Authorization', `Bearer ${signAccessToken({ sub: TEST_USER.id })}`)
+      .send({
+        fullName: createdUser.fullName,
+        email: createdUser.email,
+        password: 'temporary-password-123',
+        roleId: 4,
+        metadata: { department: 'Finance & Endowment' },
+      });
+
+    expect(res.status).toBe(201);
+    expect(mockPrisma.user.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        metadata: { department: 'Finance & Endowment', forcePasswordReset: true },
+      }),
+    }));
+    expect(mockPrisma.passwordResetToken.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        userId: createdUser.id,
+        expiresAt: expect.any(Date),
+      }),
+    }));
+    expect(mockSendEmail).toHaveBeenCalledWith(createdUser.email, expect.objectContaining({
+      subject: expect.stringMatching(/set your .* password/i),
+      linkLabel: 'Set your password',
+      verificationUrl: expect.stringMatching(/\/login\?resetPassword=/),
+    }));
   });
 });
 
@@ -308,12 +384,16 @@ describe('POST /api/v1/auth/forgot-password', () => {
 });
 
 describe('POST /api/v1/auth/reset-password', () => {
-  it('updates the password and revokes existing refresh tokens', async () => {
+  it('updates the password, clears the forced-reset flag, and revokes existing refresh tokens', async () => {
     mockPrisma.passwordResetToken.findUnique.mockResolvedValue({
       id: 3,
       userId: TEST_USER.id,
       usedAt: null,
       expiresAt: new Date(Date.now() + 60_000),
+    });
+    mockPrisma.user.findUnique.mockResolvedValue({
+      ...TEST_USER,
+      metadata: { forcePasswordReset: true, department: 'Finance & Endowment' },
     });
     mockPrisma.passwordResetToken.update.mockResolvedValue({ id: 3 });
     mockPrisma.user.update.mockResolvedValue({ id: TEST_USER.id });
@@ -329,7 +409,10 @@ describe('POST /api/v1/auth/reset-password', () => {
     expect(res.body.data).toEqual({ passwordReset: true });
     expect(mockPrisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: TEST_USER.id },
-      data: { passwordHash: expect.any(String) },
+      data: {
+        passwordHash: expect.any(String),
+        metadata: { department: 'Finance & Endowment' },
+      },
     }));
     expect(mockPrisma.passwordResetToken.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 3 },

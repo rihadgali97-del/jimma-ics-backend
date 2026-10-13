@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import { usersRepository } from './users.repository.js';
 import { documentsRepository } from '../documents/documents.repository.js';
 import { authRepository } from '../auth/auth.repository.js';
+import { sendPasswordResetEmail } from '../auth/auth.service.js';
 import { hashPassword } from '../../common/utils/password.js';
 import { NotFoundError, ConflictError, BadRequestError } from '../../common/errors/httpErrors.js';
 import { writeAuditLog } from '../../common/utils/auditLog.js';
@@ -90,7 +91,7 @@ export async function createUser({ fullName, email, phone, password, roleId, isA
     passwordHash,
     roleId,
     isActive,
-    metadata,
+    metadata: { ...(metadata || {}), forcePasswordReset: true },
   });
 
   await writeAuditLog({
@@ -100,6 +101,8 @@ export async function createUser({ fullName, email, phone, password, roleId, isA
     entityId: user.id,
     after: toPublicUser(user),
   });
+
+  await sendPasswordResetEmail(user, true);
 
   return toPublicUser(user);
 }

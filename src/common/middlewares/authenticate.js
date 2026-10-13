@@ -33,6 +33,9 @@ export const authenticate = asyncHandler(async (req, res, next) => {
   if (!user || !user.isActive) {
     throw new UnauthorizedError('Account is inactive or no longer exists');
   }
+  if (user.metadata?.forcePasswordReset === true) {
+    throw new UnauthorizedError('Reset your password using the link sent to your email before signing in');
+  }
 
   req.user = {
     id: user.id,
