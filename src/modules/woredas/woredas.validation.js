@@ -48,6 +48,12 @@ export const updateWoredaSchema = z.object({
   params: idParamSchema,
   body: z
     .object({
+      code: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .regex(/^[a-z0-9-]+$/, 'code must be lowercase letters, numbers, and hyphens only')
+        .optional(),
       name: translationsShape,
       isActive: z.boolean().optional(),
       ...gisProfileFields,

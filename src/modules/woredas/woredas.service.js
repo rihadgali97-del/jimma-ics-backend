@@ -182,15 +182,21 @@ export async function createWoreda({ code, name, ...gisProfile }, actorId) {
   return getWoreda(woreda.id);
 }
 
-export async function updateWoreda(id, { name, isActive, ...gisProfile }, actorId) {
+export async function updateWoreda(id, { code, name, isActive, ...gisProfile }, actorId) {
   const woreda = await woredasRepository.findById(id);
   if (!woreda) throw new NotFoundError('Woreda not found');
+
+  if (code && code !== woreda.code) {
+    const existing = await woredasRepository.findByCode(code);
+    if (existing) throw new ConflictError('A woreda with this code already exists');
+  }
 
   const beforeTranslations = name
     ? await getTranslationsForEntity(ENTITY_TYPE, id, ['name'])
     : {};
   if (name) await upsertTranslations(ENTITY_TYPE, id, { name });
   const updateData = {
+    ...(code !== undefined ? { code } : {}),
     ...gisProfile,
     ...(isActive !== undefined ? { isActive } : {}),
   };
@@ -203,11 +209,13 @@ export async function updateWoreda(id, { name, isActive, ...gisProfile }, actorI
     entityType: ENTITY_TYPE,
     entityId: id,
     before: {
+      ...(code !== undefined ? { code: woreda.code } : {}),
       ...(name ? { name: resolveLocale(beforeTranslations.name, DEFAULT_LOCALE) } : {}),
       isActive: woreda.isActive,
       ...Object.fromEntries(profileFields.map((field) => [field, woreda[field]])),
     },
     after: {
+      ...(code !== undefined ? { code } : {}),
       ...(name ? { name: resolveLocale(name, DEFAULT_LOCALE) } : {}),
       isActive: isActive ?? woreda.isActive,
       ...gisProfile,

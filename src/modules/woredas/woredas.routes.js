@@ -114,7 +114,7 @@ woredasRouter.post(
  * @openapi
  * /locations/woredas/{id}:
  *   patch:
- *     summary: Update a Woreda's translated name or public availability
+ *     summary: Update a Woreda's stable code, translated name, profile, or public availability
  *     tags: [Locations]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -129,6 +129,7 @@ woredasRouter.post(
  *           schema:
  *             type: object
  *             properties:
+ *               code: { type: string, example: limmu-kosa }
  *               name: { type: object }
  *               isActive: { type: boolean }
  *     responses:

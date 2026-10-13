@@ -120,4 +120,33 @@ describe('Woreda registry', () => {
     }));
     expect(result.isActive).toBe(false);
   });
+
+  it('updates a woreda stable code and audits the old and new values', async () => {
+    repository.findById
+      .mockResolvedValueOnce({ id: 4, code: 'old-code', isActive: true })
+      .mockResolvedValueOnce({ id: 4, code: 'new-code', isActive: true });
+    repository.findByCode.mockResolvedValue(null);
+    repository.update.mockResolvedValue({ id: 4, code: 'new-code', isActive: true });
+    getTranslationsForEntity.mockResolvedValue({});
+
+    const result = await updateWoreda(4, { code: 'new-code' }, 9);
+
+    expect(repository.findByCode).toHaveBeenCalledWith('new-code');
+    expect(repository.update).toHaveBeenCalledWith(4, { code: 'new-code' });
+    expect(writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      before: { code: 'old-code', isActive: true },
+      after: { code: 'new-code', isActive: true },
+    }));
+    expect(result.code).toBe('new-code');
+  });
+
+  it('rejects a stable code that is already assigned to another woreda', async () => {
+    repository.findById.mockResolvedValue({ id: 4, code: 'old-code', isActive: true });
+    repository.findByCode.mockResolvedValue({ id: 5, code: 'new-code' });
+
+    await expect(updateWoreda(4, { code: 'new-code' }, 9))
+      .rejects.toThrow('A woreda with this code already exists');
+    expect(repository.update).not.toHaveBeenCalled();
+    expect(writeAuditLog).not.toHaveBeenCalled();
+  });
 });
