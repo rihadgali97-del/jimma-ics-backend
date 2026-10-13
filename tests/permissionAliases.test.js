@@ -33,6 +33,10 @@ describe('expandPermissionAliases', () => {
     ));
     expect(new Set(catalogKeys).size).toBe(catalogKeys.length);
     expect(catalogKeys.every(isApiPermissionKey)).toBe(true);
+    expect(permissionCatalog.categories
+      .flatMap((category) => category.permissions)
+      .find((permission) => permission.id === 'users.manage')
+      .endpoints).toContain('/admin/roles');
     expect(permissionCatalog.categories.every((category) => (
       category.permissions.every((permission) => (
         Array.isArray(permission.endpoints) && permission.endpoints.length > 0

@@ -43,6 +43,18 @@ describe('role permission authorization', () => {
     expect(result).toBeNull();
   });
 
+  it.each(['users.manage', 'roles.manage'])(
+    'allows the shared staff access page permission %s',
+    async (permission) => {
+      const result = await runMiddleware(authorizeAny('users.manage', 'roles.manage'), {
+        roleName: 'staff_operator',
+        permissions: [permission],
+      });
+
+      expect(result).toBeNull();
+    }
+  );
+
   it('reserves role-only routes for the named role', async () => {
     const result = await runMiddleware(requireRole('super_admin'), {
       roleName: 'finance_officer',

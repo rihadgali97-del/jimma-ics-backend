@@ -56,6 +56,9 @@ export async function listUsers(query) {
     search: query.search,
     roleId: query.roleId,
     isActive: query.isActive,
+    department: query.department,
+    district: query.district,
+    status: query.status,
   });
 
   return {

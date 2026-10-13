@@ -5,6 +5,9 @@ export const listUsersSchema = z.object({
   query: paginationQuerySchema.extend({
     search: z.string().trim().min(1).optional(),
     roleId: z.coerce.number().int().positive().optional(),
+    department: z.string().trim().min(1).max(120).optional(),
+    district: z.string().trim().min(1).max(120).optional(),
+    status: z.enum(['Active', 'On Leave', 'Pending Invitation', 'Suspended']).optional(),
     isActive: z
       .enum(['true', 'false'])
       .optional()
