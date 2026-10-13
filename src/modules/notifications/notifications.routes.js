@@ -51,7 +51,7 @@ notificationsPublicRouter.delete(
 
 notificationsAdminRouter.use(
   authenticate,
-  authorizeAny('events.write', 'announcements.write')
+  authorizeAny('events.write', 'announcements.write', 'announcements.broadcast', 'broadcast.send')
 );
 notificationsAdminRouter.get('/', validate(listNotificationsSchema), notificationsController.listLogs);
 notificationsAdminRouter.get('/telegram/status', notificationsController.getTelegramStatus);

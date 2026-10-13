@@ -8,6 +8,7 @@ import { sendCreated, sendNoContent, sendSuccess } from '../../common/utils/apiR
 import { writeAuditLog } from '../../common/utils/auditLog.js';
 import { BadRequestError, ConflictError, NotFoundError } from '../../common/errors/httpErrors.js';
 import { prisma } from '../../config/database.js';
+import { getUnknownPermissionKeys, normalizeKnownPermissionKeys, normalizePermissionKeys } from '../../common/utils/permissionCatalog.js';
 
 export const rolesRouter = Router();
 const systemRoleNames = new Set([
@@ -23,7 +24,12 @@ const metadataSchema = z.record(z.unknown()).optional();
 const roleBody = z.object({
   name: z.string().trim().min(2).max(100),
   description: z.string().trim().max(1000).optional().nullable(),
-  permissions: z.array(z.string().trim().min(1).max(150)).transform((items) => [...new Set(items)]).optional(),
+  permissions: z.array(z.string().trim().min(1).max(150))
+    .refine((items) => getUnknownPermissionKeys(items).length === 0, {
+      message: 'Every permission must exist in the canonical permission catalog.',
+    })
+    .transform((items) => [...new Set(items)])
+    .optional(),
   metadata: metadataSchema,
 });
 
@@ -32,7 +38,7 @@ function toPublicRole(role) {
     id: role.id,
     name: role.name,
     description: role.description,
-    permissions: role.permissions.map(({ permission }) => permission.key),
+    permissions: normalizeKnownPermissionKeys(role.permissions.map(({ permission }) => permission.key)),
     isSystemRole: systemRoleNames.has(role.name),
     assignedUsersCount: role._count?.users ?? 0,
     createdAt: role.createdAt,
@@ -67,7 +73,8 @@ rolesRouter.get('/', asyncHandler(async (req, res) => {
 }));
 
 rolesRouter.post('/', validate(z.object({ body: roleBody })), asyncHandler(async (req, res) => {
-  const { name, description, permissions = [], metadata = {} } = req.body;
+  const { name, description, metadata = {} } = req.body;
+  const permissions = normalizePermissionKeys(req.body.permissions || []);
   if (systemRoleNames.has(name)) throw new BadRequestError('Reserved system role names cannot be created.');
   const existing = await prisma.role.findUnique({ where: { name } });
   if (existing) throw new ConflictError('A role with this name already exists.');
@@ -110,7 +117,10 @@ rolesRouter.patch('/:id', validate(z.object({
 })), asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const existing = await getRole(id);
-  const { permissions, ...changes } = req.body;
+  const { permissions: requestedPermissions, ...changes } = req.body;
+  const permissions = requestedPermissions === undefined
+    ? undefined
+    : normalizePermissionKeys(requestedPermissions);
   if (existing.name === 'super_admin') {
     throw new BadRequestError('The super_admin role has full access by system policy and cannot be modified.');
   }

@@ -1,10 +1,12 @@
 import { ForbiddenError } from '../errors/httpErrors.js';
+import { isApiPermissionKey } from '../utils/permissionCatalog.js';
 
 // Permission-based authorization: authorize('mosques.write') requires the
 // authenticated user's role to carry that permission key. Always mount
 // `authenticate` before this on the route. `super_admin` implicitly passes
 // every check.
 export function authorize(...requiredPermissions) {
+  assertKnownApiPermissions(requiredPermissions);
   return function authorizeMiddleware(req, res, next) {
     if (!req.user) {
       return next(new ForbiddenError('Authentication is required before authorization'));
@@ -44,6 +46,7 @@ export function requireRole(...roleNames) {
 }
 
 export function authorizeAny(...permissions) {
+  assertKnownApiPermissions(permissions);
   return function authorizeAnyMiddleware(req, res, next) {
     if (!req.user) return next(new ForbiddenError('Authentication is required before authorization'));
     const grantedPermissions = Array.isArray(req.user.permissions) ? req.user.permissions : [];
@@ -52,4 +55,11 @@ export function authorizeAny(...permissions) {
     }
     return next(new ForbiddenError(`Requires one of these permissions: ${permissions.join(', ')}`));
   };
+}
+
+function assertKnownApiPermissions(permissions) {
+  const unknown = permissions.filter((permission) => !isApiPermissionKey(permission));
+  if (unknown.length > 0) {
+    throw new Error(`Authorization uses permission key(s) missing from the canonical permission catalog: ${unknown.join(', ')}`);
+  }
 }

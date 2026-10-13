@@ -7,8 +7,17 @@ import { NotFoundError, ConflictError, BadRequestError } from '../../common/erro
 import { writeAuditLog } from '../../common/utils/auditLog.js';
 import { parsePagination, buildPaginationMeta } from '../../common/utils/pagination.js';
 import { env } from '../../config/env.js';
+import { normalizeKnownPermissionKeys, normalizePermissionKeys } from '../../common/utils/permissionCatalog.js';
 
 function toPublicUser(user) {
+  const metadata = user.metadata && typeof user.metadata === 'object'
+    ? {
+        ...user.metadata,
+        ...(Array.isArray(user.metadata.customPermissions)
+          ? { customPermissions: normalizeKnownPermissionKeys(user.metadata.customPermissions) }
+          : {}),
+      }
+    : user.metadata;
   return {
     id: user.id,
     fullName: user.fullName,
@@ -19,12 +28,24 @@ function toPublicUser(user) {
     role: {
       id: user.role.id,
       name: user.role.name,
-      permissions: user.role.permissions.map(({ permission }) => permission.key),
+      permissions: normalizeKnownPermissionKeys(user.role.permissions.map(({ permission }) => permission.key)),
     },
     lastLoginAt: user.lastLoginAt,
     createdAt: user.createdAt,
-    metadata: user.metadata,
+    metadata,
   };
+}
+
+function normalizeUserMetadata(metadata) {
+  if (metadata?.customPermissions === undefined) return metadata;
+  if (!Array.isArray(metadata.customPermissions) || !metadata.customPermissions.every((permission) => typeof permission === 'string')) {
+    throw new BadRequestError('customPermissions must be an array of permission keys.');
+  }
+  try {
+    return { ...metadata, customPermissions: normalizePermissionKeys(metadata.customPermissions) };
+  } catch (error) {
+    throw new BadRequestError(error instanceof Error ? error.message : 'Unknown permission key.');
+  }
 }
 
 export async function listUsers(query) {
@@ -50,6 +71,7 @@ export async function getUser(id) {
 }
 
 export async function createUser({ fullName, email, phone, password, roleId, isActive = true, metadata }, actorId) {
+  metadata = normalizeUserMetadata(metadata);
   const role = await usersRepository.findRoleById(roleId);
   if (!role) throw new BadRequestError('roleId does not reference an existing role');
 
@@ -105,10 +127,22 @@ export async function updateUser(id, changes, actorId) {
         ...(isApproval ? { approvalStatus: 'approved' } : {}),
       }
     : undefined;
+  const customPermissionsProvided = changes.metadata
+    && Object.prototype.hasOwnProperty.call(changes.metadata, 'customPermissions');
+  const normalizedMetadata = metadata === undefined
+    ? undefined
+    : customPermissionsProvided
+      ? normalizeUserMetadata(metadata)
+      : {
+          ...metadata,
+          ...(Array.isArray(metadata.customPermissions)
+            ? { customPermissions: normalizeKnownPermissionKeys(metadata.customPermissions) }
+            : {}),
+        };
 
   const updated = await usersRepository.update(id, {
     ...changes,
-    ...(metadata !== undefined ? { metadata } : {}),
+    ...(normalizedMetadata !== undefined ? { metadata: normalizedMetadata } : {}),
   });
 
   // Deactivating an account must also kill any live sessions immediately —

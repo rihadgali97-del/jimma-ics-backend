@@ -1,6 +1,7 @@
 import argon2 from 'argon2';
 import { prisma } from '../config/database.js';
 import { logger } from '../common/utils/logger.js';
+import { permissionCatalog } from '../common/utils/permissionCatalog.js';
 
 // Roles from the requirements doc (§1). Permission keys are namespaced
 // `<domain>.<action>` so future modules just add new keys — no schema change.
@@ -14,29 +15,9 @@ const ROLES = [
   { name: 'pending_staff', description: 'New staff account awaiting role assignment; no permissions' },
 ];
 
-const PERMISSIONS = [
-  'users.manage',
-  'roles.manage',
-  'woredas.write',
-  'mosques.write',
-  'madrasas.write',
-  'documents.write',
-  'zakat.manage',
-  'zakat.rates.write',
-  'janazah.manage',
-  'cemetery_plots.write',
-  'waqf.write',
-  'finance.write',
-  'announcements.write',
-  'announcements.broadcast',
-  'events.write',
-  'broadcast.send',
-  'fatwas.write',
-  'leadership.write',
-  'dashboard.view',
-  'translations.write',
-  'official_inquiries.manage',
-];
+const PERMISSIONS = permissionCatalog.categories.flatMap((category) => (
+  category.permissions.map((permission) => permission.id)
+));
 
 // 18 Woredas mentioned in the frontend README. Names/translations are
 // added via the `translations` table once the woredas module exists.
