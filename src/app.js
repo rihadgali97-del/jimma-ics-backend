@@ -23,6 +23,10 @@ export function createApp() {
 
   app.disable('x-powered-by');
   app.use(helmet());
+  app.use(
+    env.API_PREFIX,
+    helmet.crossOriginResourcePolicy({ policy: 'cross-origin' })
+  );
   app.use(cors({ origin: env.CORS_ORIGIN }));
   app.use(compression());
   app.use(express.json({ limit: '2mb' }));
@@ -59,6 +63,10 @@ export function createApp() {
   // Serve uploaded files (mosque/madrasa photos, etc.) statically. In
   // production this would typically move to a CDN/object storage — see
   // the storage abstraction note in the requirements doc.
+  app.use(
+    `/${env.UPLOAD_DIR}`,
+    helmet.crossOriginResourcePolicy({ policy: 'cross-origin' })
+  );
   app.use(`/${env.UPLOAD_DIR}`, express.static(env.UPLOAD_DIR));
 
   // Swagger UI — served outside the versioned prefix so docs URL stays
