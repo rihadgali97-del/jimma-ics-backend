@@ -1,6 +1,39 @@
 import { prisma } from '../../config/database.js';
 import { logger } from './logger.js';
-import { getAuditRequestIp } from './auditRequestContext.js';
+import { getAuditRequestId, getAuditRequestIp } from './auditRequestContext.js';
+
+export async function recordAuditWriteFailure({ err, actorId = null, action, entityType, entityId = null, requestId = getAuditRequestId() }) {
+  const errorCode = typeof err?.code === 'string' ? err.code.slice(0, 100) : null;
+  const errorMessage = (typeof err?.message === 'string' ? err.message : 'Unknown audit persistence error')
+    .replace(/[\r\n\t]+/g, ' ')
+    .slice(0, 500);
+
+  logger.error({
+    event: 'audit_write_failed',
+    err,
+    actorId,
+    action,
+    entityType,
+    entityId,
+    requestId,
+  }, 'Audit record write failed');
+
+  try {
+    await prisma.auditWriteFailure.create({
+      data: { actorId, action, entityType, entityId, requestId, errorCode, errorMessage },
+    });
+  } catch (failureRecordError) {
+    logger.error({
+      event: 'audit_write_failure_record_failed',
+      err: failureRecordError,
+      actorId,
+      action,
+      entityType,
+      entityId,
+      requestId,
+    }, 'Could not persist audit write failure for operational review');
+  }
+}
 
 /**
  * Writes one row to `audit_logs`. Called by services after any
@@ -33,6 +66,6 @@ export async function writeAuditLog({
       },
     });
   } catch (err) {
-    logger.error({ err, action, entityType, entityId }, 'Failed to write audit log');
+    await recordAuditWriteFailure({ err, actorId, action, entityType, entityId });
   }
 }

@@ -9,6 +9,8 @@ import { z } from '../../common/validation/shared.js';
 import { prisma } from '../../config/database.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { NotFoundError } from '../../common/errors/httpErrors.js';
+import { logger } from '../../common/utils/logger.js';
+import { recordAuditWriteFailure } from '../../common/utils/auditLog.js';
 
 export const auditRouter = Router();
 auditRouter.use(authenticate);
@@ -62,18 +64,29 @@ function currentDirectives(events) {
   return [...latest.values()].filter(Boolean);
 }
 
+function isMissingTableError(err) {
+  const code = typeof err?.code === 'string' ? err.code : '';
+  const message = typeof err?.message === 'string' ? err.message : '';
+  return code === 'P2021' || /does not exist in the current database/i.test(message) || /no such table/i.test(message);
+}
+
 async function writeAuditEvent(req, { action, entityType, entityId = null, before = null, after = null }) {
-  return prisma.auditLog.create({
-    data: {
-      actorId: req.user.id,
-      action,
-      entityType,
-      entityId,
-      beforeJson: before ?? undefined,
-      afterJson: after ?? undefined,
-      ipAddress: req.ip,
-    },
-  });
+  try {
+    return await prisma.auditLog.create({
+      data: {
+        actorId: req.user.id,
+        action,
+        entityType,
+        entityId,
+        beforeJson: before ?? undefined,
+        afterJson: after ?? undefined,
+        ipAddress: req.ip,
+      },
+    });
+  } catch (err) {
+    await recordAuditWriteFailure({ err, actorId: req.user.id, action, entityType, entityId });
+    throw err;
+  }
 }
 
 function mapAuditLog(item) {
@@ -114,6 +127,72 @@ auditRouter.get('/', authorize('users.manage'), validate(z.object({
     data: items.map(mapAuditLog),
     meta: buildPaginationMeta({ page, pageSize, totalItems }),
   });
+}));
+
+auditRouter.get('/write-failures', authorize('users.manage'), validate(z.object({
+  query: z.object({
+    page: z.coerce.number().int().positive().optional(),
+    pageSize: z.coerce.number().int().positive().max(100).optional(),
+    status: z.enum(['open', 'reviewed', 'all']).default('open'),
+  }),
+})), asyncHandler(async (req, res) => {
+  const { page, pageSize, skip, take } = parsePagination(req.query);
+  const where = req.query.status === 'all'
+    ? {}
+    : { reviewedAt: req.query.status === 'reviewed' ? { not: null } : null };
+
+  try {
+    const [items, totalItems] = await Promise.all([
+      prisma.auditWriteFailure.findMany({
+        where,
+        skip,
+        take,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+      prisma.auditWriteFailure.count({ where }),
+    ]);
+
+    sendSuccess(res, {
+      data: items,
+      meta: buildPaginationMeta({ page, pageSize, totalItems }),
+    });
+    return;
+  } catch (err) {
+    if (isMissingTableError(err)) {
+      sendSuccess(res, {
+        data: [],
+        meta: buildPaginationMeta({ page, pageSize, totalItems: 0 }),
+      });
+      logger.warn({ event: 'audit_write_failure_table_missing', err }, 'Audit write failure table missing; returning empty review queue');
+      return;
+    }
+    throw err;
+  }
+}));
+
+auditRouter.patch('/write-failures/:id/review', authorize('users.manage'), validate(z.object({
+  params: z.object({ id: z.coerce.number().int().positive() }),
+})), asyncHandler(async (req, res) => {
+  try {
+    const result = await prisma.auditWriteFailure.updateMany({
+      where: { id: req.params.id, reviewedAt: null },
+      data: { reviewedAt: new Date(), reviewedBy: req.user.id },
+    });
+    if (result.count === 0) {
+      const existing = await prisma.auditWriteFailure.findUnique({ where: { id: req.params.id } });
+      if (!existing) throw new NotFoundError('Audit write failure not found');
+    }
+    const failure = await prisma.auditWriteFailure.findUnique({ where: { id: req.params.id } });
+    sendSuccess(res, { data: failure });
+    return;
+  } catch (err) {
+    if (isMissingTableError(err)) {
+      logger.warn({ event: 'audit_write_failure_table_missing', err }, 'Audit table missing; review endpoint cannot mark records as reviewed');
+      sendSuccess(res, { data: null, message: 'Audit write failure review is unavailable because the database table is not present.' });
+      return;
+    }
+    throw err;
+  }
 }));
 
 auditRouter.get('/compliance', authorize(...AUDIT_PERMISSIONS), validate(z.object({

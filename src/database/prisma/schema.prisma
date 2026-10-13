@@ -428,6 +428,24 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model AuditWriteFailure {
+  id          Int       @id @default(autoincrement())
+  actorId     Int?      @map("actor_id")
+  action      String    @db.VarChar(100)
+  entityType  String    @map("entity_type") @db.VarChar(100)
+  entityId    Int?      @map("entity_id")
+  requestId   String?   @map("request_id") @db.VarChar(191)
+  errorCode   String?   @map("error_code") @db.VarChar(100)
+  errorMessage String  @map("error_message") @db.VarChar(500)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  reviewedAt  DateTime? @map("reviewed_at")
+  reviewedBy  Int?      @map("reviewed_by")
+
+  @@index([reviewedAt, createdAt])
+  @@index([createdAt])
+  @@map("audit_write_failures")
+}
+
 // ---------------------------------------------------------------------------
 // Phase 3: Mosques & Madrasas directories
 // ---------------------------------------------------------------------------
