@@ -15,7 +15,7 @@ export const defaultRateLimiter = rateLimit({
 
 // Tighter limiter for unauthenticated, abuse-prone endpoints: login,
 // public application submission (Nikah/Zakat/Janazah), broadcast subscribe.
-export function strictRateLimiter({ windowMs = 15 * 60 * 1000, max = 10 } = {}) {
+export function strictRateLimiter({ windowMs = 15 * 60 * 1000, max = 100} = {}) {
   return rateLimit({
     windowMs,
     max,
