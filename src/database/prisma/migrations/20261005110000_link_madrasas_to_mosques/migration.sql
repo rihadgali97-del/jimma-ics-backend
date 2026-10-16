@@ -1,5 +1,7 @@
 ALTER TABLE `madrasas`
-    ADD COLUMN `mosque_id` INTEGER NULL,
+    ADD COLUMN `mosque_id` INTEGER NULL;
+
+ALTER TABLE `madrasas`
     ADD UNIQUE INDEX `madrasas_mosque_id_key`(`mosque_id`);
 
 ALTER TABLE `madrasas`
