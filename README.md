@@ -74,10 +74,11 @@ repository root and provide `DATABASE_URL` when prompted. The Blueprint uses
 Render's Starter plans for the API and Key Value service; review the current
 pricing in Render before applying it.
 
-The Render Docker context is the `jimma_ics-main-main` directory, not only the
-backend directory, because the API imports the shared
-`permissions/permissionCatalog.json` file. Its `.dockerignore` excludes local
-environment files and dependency/build output from the image.
+The shared permission catalog lives inside the backend project so it is
+included whether Render builds from the backend directory or the repository
+root. The frontend imports this same catalog. The repository-level
+`.dockerignore` excludes local environment files and dependency/build output
+from Docker images.
 
 The Blueprint sets the production frontend origin, generates separate JWT
 secrets, and connects the API to Render Key Value over its private connection.

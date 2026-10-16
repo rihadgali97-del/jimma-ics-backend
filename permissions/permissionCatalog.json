@@ -1,0 +1,298 @@
+{
+  "categories": [
+    {
+      "id": "staff_access",
+      "name": "Staff & Access Administration",
+      "arabicName": "إدارة الكادر وصلاحيات الوصول",
+      "description": "Staff accounts, role profiles, and administrative access.",
+      "iconName": "ShieldCheck",
+      "permissions": [
+        {
+          "id": "users.manage",
+          "name": "Manage Staff Accounts",
+          "description": "View, create, update, and deactivate staff accounts and review security audit events.",
+          "module": "staff_access",
+          "risk": "Critical",
+          "endpoints": ["/admin/users/*", "/admin/audit-logs/*", "/admin/roles"]
+        },
+        {
+          "id": "roles.manage",
+          "name": "Manage Roles & Permissions",
+          "description": "Create role profiles and assign recognized permissions.",
+          "module": "staff_access",
+          "risk": "Critical",
+          "endpoints": ["/admin/roles/*"]
+        }
+      ]
+    },
+    {
+      "id": "locations",
+      "name": "Locations & Directory",
+      "arabicName": "المواقع والدليل",
+      "description": "Administrative location directory.",
+      "iconName": "MapPin",
+      "permissions": [
+        {
+          "id": "woredas.write",
+          "name": "Manage Kebeles",
+          "description": "Create and maintain administrative kebele records.",
+          "module": "locations",
+          "risk": "High",
+          "endpoints": ["/locations/woredas/*"]
+        }
+      ]
+    },
+    {
+      "id": "mosques_waqf",
+      "name": "Mosques & Waqf Affairs",
+      "arabicName": "شؤون المساجد والأوقاف",
+      "description": "Mosque registry and waqf property administration.",
+      "iconName": "Building",
+      "permissions": [
+        {
+          "id": "mosques.write",
+          "name": "Manage Mosque Registry",
+          "description": "Create and update mosque profiles and related registry data.",
+          "module": "mosques_waqf",
+          "risk": "High",
+          "endpoints": ["/admin/mosques/*"]
+        },
+        {
+          "id": "waqf.write",
+          "name": "Manage Waqf Assets",
+          "description": "Manage waqf assets and related records.",
+          "module": "mosques_waqf",
+          "risk": "High",
+          "endpoints": ["/admin/waqf/*"]
+        }
+      ]
+    },
+    {
+      "id": "education_tahfeez",
+      "name": "Islamic Education & Tahfeez",
+      "arabicName": "التعليم الإسلامي والتحفيظ",
+      "description": "Madrasa, teacher, and student administration.",
+      "iconName": "BookOpen",
+      "permissions": [
+        {
+          "id": "madrasas.write",
+          "name": "Manage Madrasas, Teachers & Students",
+          "description": "Manage madrasa records, teaching staff, student records, and attendance.",
+          "module": "education_tahfeez",
+          "risk": "High",
+          "endpoints": ["/admin/madrasas/*", "/admin/teachers/*", "/admin/students/*"]
+        }
+      ]
+    },
+    {
+      "id": "shariah_ulema",
+      "name": "Shariah & Fatwa Council",
+      "arabicName": "هيئة الفتوى والعلماء",
+      "description": "Scholar directory administration and fatwa publishing.",
+      "iconName": "Users",
+      "permissions": [
+        {
+          "id": "fatwas.write",
+          "name": "Manage Scholars & Fatwas",
+          "description": "Manage scholar records and publish fatwas.",
+          "module": "shariah_ulema",
+          "risk": "High",
+          "endpoints": ["/admin/ulema/*", "/admin/fatwas/*"]
+        }
+      ]
+    },
+    {
+      "id": "finance_zakat",
+      "name": "Finance, Zakat & Endowment",
+      "arabicName": "المالية والزكاة والأوقاف",
+      "description": "Financial operations, zakat administration, and rates.",
+      "iconName": "WalletCards",
+      "permissions": [
+        {
+          "id": "finance.write",
+          "name": "Manage Finance",
+          "description": "Access finance administration and record financial operations.",
+          "module": "finance_zakat",
+          "risk": "Critical",
+          "endpoints": ["/admin/finance/*", "/admin/donations/*"]
+        },
+        {
+          "id": "zakat.manage",
+          "name": "Manage Zakat & Welfare",
+          "description": "Review zakat applications and manage distributions and service requests.",
+          "module": "finance_zakat",
+          "risk": "High",
+          "endpoints": ["/admin/zakat/*", "/admin/donations/*", "/admin/services/*"]
+        },
+        {
+          "id": "zakat.rates.write",
+          "name": "Manage Zakat Rates",
+          "description": "Set published nisab rates.",
+          "module": "finance_zakat",
+          "risk": "High",
+          "endpoints": ["/admin/zakat/rates"]
+        }
+      ]
+    },
+    {
+      "id": "janazah_services",
+      "name": "Janazah & Cemetery Services",
+      "arabicName": "خدمات الجنائز والمقابر",
+      "description": "Funeral support requests and cemetery plot administration.",
+      "iconName": "HandHeart",
+      "permissions": [
+        {
+          "id": "janazah.manage",
+          "name": "Manage Janazah Services",
+          "description": "Review and coordinate funeral support requests.",
+          "module": "janazah_services",
+          "risk": "High",
+          "endpoints": ["/admin/janazah/*"]
+        },
+        {
+          "id": "cemetery_plots.write",
+          "name": "Manage Cemetery Plots",
+          "description": "Maintain cemetery plot records.",
+          "module": "janazah_services",
+          "risk": "High",
+          "endpoints": ["/admin/janazah/cemetery-plots/*"]
+        }
+      ]
+    },
+    {
+      "id": "community",
+      "name": "Community Services & Events",
+      "arabicName": "الخدمات المجتمعية والفعاليات",
+      "description": "Events, announcements, and official council documents.",
+      "iconName": "CalendarDays",
+      "permissions": [
+        {
+          "id": "announcements.write",
+          "name": "Manage Announcements",
+          "description": "Create and publish council announcements.",
+          "module": "community",
+          "risk": "Medium",
+          "endpoints": ["/admin/announcements/*"]
+        },
+        {
+          "id": "announcements.broadcast",
+          "name": "Broadcast Announcements",
+          "description": "Send announcement-related notifications.",
+          "module": "community",
+          "risk": "High",
+          "endpoints": ["/admin/notifications/*"]
+        },
+        {
+          "id": "events.write",
+          "name": "Manage Events & Programs",
+          "description": "Create and manage event schedules, registrations, and attendance.",
+          "module": "community",
+          "risk": "High",
+          "endpoints": ["/admin/events/*"]
+        },
+        {
+          "id": "documents.write",
+          "name": "Manage Council Documents",
+          "description": "Upload and manage official council documents.",
+          "module": "community",
+          "risk": "High",
+          "endpoints": ["/documents/*"]
+        }
+      ]
+    },
+    {
+      "id": "communications",
+      "name": "Communications Gateway",
+      "arabicName": "بوابة الاتصالات",
+      "description": "Messaging and dispatch administration.",
+      "iconName": "Radio",
+      "permissions": [
+        {
+          "id": "broadcast.send",
+          "name": "Manage Broadcast Gateway",
+          "description": "Access the communications gateway and send authorized broadcasts.",
+          "module": "communications",
+          "risk": "Critical",
+          "endpoints": ["/admin/notifications/*"]
+        }
+      ]
+    },
+    {
+      "id": "leadership",
+      "name": "Leadership & Governance",
+      "arabicName": "القيادة والحوكمة",
+      "description": "Leadership directory and administrative oversight.",
+      "iconName": "UserCheck",
+      "permissions": [
+        {
+          "id": "leadership.write",
+          "name": "Manage Leadership Directory",
+          "description": "Maintain the council leadership directory.",
+          "module": "leadership",
+          "risk": "High",
+          "endpoints": ["/admin/leadership/*"]
+        },
+        {
+          "id": "dashboard.view",
+          "name": "View Administrative Dashboard",
+          "description": "Access the authenticated administrative overview.",
+          "module": "leadership",
+          "risk": "Low",
+          "endpoints": ["/admin/dashboard/*"]
+        },
+        {
+          "id": "translations.write",
+          "name": "Manage Translations",
+          "description": "Maintain supported translations for council content.",
+          "module": "leadership",
+          "risk": "Medium",
+          "endpoints": ["/admin/translations/*"]
+        },
+        {
+          "id": "official_inquiries.manage",
+          "name": "Manage Official Inquiries",
+          "description": "Review and respond to official inquiries.",
+          "module": "leadership",
+          "risk": "High",
+          "endpoints": ["/admin/official-inquiries/*"]
+        }
+      ]
+    }
+  ],
+  "legacyAliases": {
+    "mosque.create": ["mosques.write"],
+    "mosque.edit": ["mosques.write"],
+    "mosque.grant_approve": ["mosques.write"],
+    "mosque.delete": ["mosques.write"],
+    "madrasa.accredit": ["madrasas.write"],
+    "student.manage": ["madrasas.write"],
+    "hifz.record_progress": ["madrasas.write"],
+    "teacher.manage": ["madrasas.write"],
+    "attendance.submit": ["madrasas.write"],
+    "ulema.license": ["fatwas.write"],
+    "fatwa.publish": ["fatwas.write"],
+    "finance.record_entry": ["finance.write"],
+    "finance.approve_l1": ["finance.write"],
+    "finance.approve_l2": ["finance.write"],
+    "zakat.disburse": ["zakat.manage"],
+    "services.process": ["janazah.manage", "zakat.manage"],
+    "events.schedule": ["events.write"],
+    "events.gate_checkin": ["events.write"],
+    "documents.publish": ["documents.write"],
+    "gateway.send_sabaq": ["broadcast.send"],
+    "gateway.send_janazah": ["broadcast.send"],
+    "gateway.mass_broadcast": ["broadcast.send"],
+    "gateway.topup": ["broadcast.send"],
+    "roles.customize": ["roles.manage"],
+    "users.create": ["users.manage"],
+    "users.edit_roles": ["users.manage"],
+    "users.suspend": ["users.manage"],
+    "audit.view_logs": ["users.manage"],
+    "mosque.view": [],
+    "madrasa.view": [],
+    "ulema.view": [],
+    "finance.view": [],
+    "gateway.view_logs": [],
+    "users.view": []
+  }
+}

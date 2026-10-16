@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const catalog = require('../../../../permissions/permissionCatalog.json');
+const catalog = require('../../../permissions/permissionCatalog.json');
 
 export const permissionCatalog = catalog;
 export const permissionDefinitions = new Map(

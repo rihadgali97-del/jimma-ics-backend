@@ -7,7 +7,7 @@ COPY jimma-ics-backend/package.json jimma-ics-backend/package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY jimma-ics-backend/ ./
-COPY permissions/ /app/permissions/
+COPY jimma-ics-backend/permissions/ ./permissions/
 RUN npm run prisma:generate
 
 ENV NODE_ENV=production
