@@ -1,6 +1,10 @@
 ALTER TABLE `madrasas`
-    ADD COLUMN `head_teacher_id` INTEGER NULL,
-    ADD COLUMN `hifz_graduates_count` INTEGER NULL,
+    ADD COLUMN `head_teacher_id` INTEGER NULL;
+
+ALTER TABLE `madrasas`
+    ADD COLUMN `hifz_graduates_count` INTEGER NULL;
+
+ALTER TABLE `madrasas`
     ADD INDEX `madrasas_head_teacher_id_idx`(`head_teacher_id`);
 
 ALTER TABLE `madrasas`
