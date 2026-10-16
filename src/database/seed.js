@@ -90,24 +90,38 @@ async function seedWoredas() {
       update: {},
       create: { code },
     });
-    await prisma.translation.upsert({
-      where: {
-        entityType_entityId_field_locale: {
-          entityType: 'woreda',
-          entityId: woreda.id,
-          field: 'name',
-          locale: 'en',
-        },
-      },
-      update: {},
-      create: {
+
+    const translationKey = {
+      entityType_entityId_field_locale: {
         entityType: 'woreda',
         entityId: woreda.id,
         field: 'name',
         locale: 'en',
-        value: `Kebele ${String(index + 1).padStart(2, '0')}`,
       },
-    });
+    };
+    const placeholderName = `Kebele ${String(index + 1).padStart(2, '0')}`;
+    const displayName = code
+      .split('-')
+      .map((part) => `${part[0].toUpperCase()}${part.slice(1)}`)
+      .join(' ');
+    const existingTranslation = await prisma.translation.findUnique({ where: translationKey });
+
+    if (!existingTranslation) {
+      await prisma.translation.create({
+        data: {
+          entityType: 'woreda',
+          entityId: woreda.id,
+          field: 'name',
+          locale: 'en',
+          value: displayName,
+        },
+      });
+    } else if (existingTranslation.value === placeholderName) {
+      await prisma.translation.update({
+        where: translationKey,
+        data: { value: displayName },
+      });
+    }
   }
 }
 
