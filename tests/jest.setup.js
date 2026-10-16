@@ -5,3 +5,5 @@ process.env.DATABASE_URL ??= 'mysql://jimma_ics:test@localhost:3306/jimma_ics_te
 process.env.JWT_ACCESS_SECRET ??= 'test-access-secret-please-override-in-real-env-0000000000';
 process.env.JWT_REFRESH_SECRET ??= 'test-refresh-secret-please-override-in-real-env-000000000';
 process.env.REDIS_URL ??= 'redis://localhost:6379';
+process.env.CORS_ORIGIN = 'http://localhost:3000';
+process.env.WEB_APP_URL = 'http://localhost:3000';

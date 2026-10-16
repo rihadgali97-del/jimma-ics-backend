@@ -20,8 +20,6 @@ services:
         condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
-    command: sh -c "npm run prisma:migrate:deploy && node src/server.js"
-
   mysql:
     image: mysql:8.0
     container_name: jimma_ics_mysql

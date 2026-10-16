@@ -3,10 +3,9 @@
 Backend API for the Jimma City Islamic Affairs Supreme Council digital platform.
 Node.js (ES Modules) + Express + MySQL/Prisma + JWT + Redis + BullMQ.
 
-Status: **Phase 1 — project scaffold**. Only infrastructure exists so far
-(auth/RBAC schema, error handling, response envelope, config, Docker). No
-feature modules (Nikah, Zakat, Mosques, etc.) yet — see the backend
-requirements doc for the full roadmap.
+The backend includes authentication, role-based access control, and feature
+API modules. Review the routes and tests in this repository to confirm the
+specific features and workflows enabled for your launch.
 
 ## Folder structure
 
@@ -65,6 +64,49 @@ For a production frontend build, set `VITE_API_BASE_URL` to the public HTTPS
 API URL (for example, `https://api.example.org/api/v1`) before running
 `npm run build`. Production frontend bundles intentionally fail fast if this
 value is missing or does not use HTTPS.
+
+## Production deployment settings
+
+The repository includes a Render Blueprint at `render.yaml` and Vercel SPA
+routing configuration at `jimma_ics-main-main/jimma_ics-main/vercel.json`.
+To create the backend and Redis service, create a Render Blueprint from the
+repository root and provide `DATABASE_URL` when prompted. The Blueprint uses
+Render's Starter plans for the API and Key Value service; review the current
+pricing in Render before applying it.
+
+The Blueprint sets the production frontend origin, generates separate JWT
+secrets, and connects the API to Render Key Value over its private connection.
+It prompts for the TiDB connection URL and initial admin password; keep both
+private. Ensure the API and Key Value service use the same Render region, and
+choose the region closest to the TiDB cluster where available. Never expose
+database credentials through a frontend `VITE_*` variable. For TiDB Cloud, use
+its MySQL connection URL and
+ensure it includes Prisma's `sslaccept=strict` query parameter so TLS
+certificates are verified. If the URL already has query parameters, append
+this parameter with `&` rather than adding a second `?`.
+
+The Docker image runs `prisma migrate deploy` before starting the API. Keep the
+service at one instance during initial deployment and back up the database
+before applying schema changes. Verify the migration succeeds against the
+actual TiDB cluster; MySQL-compatible services can differ in migration support.
+After the first successful deploy, open the API service's Shell in Render and
+run `npm run seed` once to create roles and the initial administrator. Then
+remove `SEED_SUPER_ADMIN_PASSWORD` from the service's environment settings and
+sign in to verify the account.
+
+For Vercel, set the project root to `jimma_ics-main-main/jimma_ics-main`
+(relative to the repository root), with build command `npm run build` and
+output directory `dist`. Add `VITE_API_BASE_URL` to the Production environment
+variables using the Render API's public HTTPS URL plus `/api/v1`. Redeploy
+after setting it because Vite embeds the value at build time. The repository
+includes an SPA rewrite so direct navigation to client-side routes resolves to
+the frontend.
+
+Do not deploy until Render's `DATABASE_URL` is populated with the real TiDB
+connection value. Production startup requires explicit `NODE_ENV`,
+`DATABASE_URL`, `REDIS_URL`, `CORS_ORIGIN`, and `WEB_APP_URL`; it rejects local
+database/Redis URLs, non-HTTPS frontend origins, non-HTTPS web app URLs,
+non-TLS-verified database URLs, and identical JWT secrets.
 
 ## Testing
 

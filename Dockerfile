@@ -12,4 +12,4 @@ RUN npm run prisma:generate
 ENV NODE_ENV=production
 EXPOSE 4000
 
-CMD ["node", "src/server.js"]
+CMD ["sh", "-c", "node --input-type=module -e \"import('./src/config/env.js')\" && npm run prisma:migrate:deploy && exec node src/server.js"]

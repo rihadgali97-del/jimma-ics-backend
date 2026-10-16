@@ -12,7 +12,7 @@ describe('GET /api/v1/health', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.status).toBe('ok');
     expect(res.headers['cross-origin-resource-policy']).toBe('cross-origin');
-    expect(res.headers['access-control-allow-origin']).toBe('*');
+    expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3000');
   });
 });
 
