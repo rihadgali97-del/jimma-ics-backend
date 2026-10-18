@@ -219,17 +219,46 @@ function escapeHtml(value) {
   })[character]);
 }
 
+function emailLayout(title, content) {
+  return `
+    <div style="margin:0;padding:32px 16px;background-color:#f4f7f5;font-family:Arial,sans-serif;color:#1f2933">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;margin:0 auto;background-color:#ffffff;border:1px solid #e2e8e4;border-radius:12px;overflow:hidden">
+        <tr>
+          <td style="padding:22px 32px;background-color:#065f46;color:#ffffff;font-size:14px;font-weight:bold;letter-spacing:.4px">
+            Jimma Islamic Council
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px">
+            <h1 style="margin:0 0 20px;color:#123b2d;font-size:24px;line-height:1.3">${escapeHtml(title)}</h1>
+            ${content}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:18px 32px;background-color:#f8faf9;color:#647067;font-size:12px;line-height:1.5">
+            This message was sent by Jimma Islamic Council.
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+}
+
 function notificationHtml(message) {
-  const text = notificationText(message);
-  const content = text
-    .split('\n')
-    .filter((line) => !message.verificationUrl || line !== `Verify your email: ${message.verificationUrl}`)
-    .map((line) => `<p>${escapeHtml(line)}</p>`)
+  const paragraphs = notificationText(message)
+    .split(/\n\n/)
+    .filter((paragraph) => paragraph !== message.title)
+    .filter((paragraph) => !message.verificationUrl || !paragraph.includes(message.verificationUrl))
+    .map((paragraph) => `<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7">${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
     .join('');
   const verificationLink = message.verificationUrl
-    ? `<p><a href="${escapeHtml(message.verificationUrl)}">${escapeHtml(message.linkLabel || 'Verify your email address')}</a></p>`
+    ? `<p style="margin:24px 0 0">
+        <a href="${escapeHtml(message.verificationUrl)}" style="display:inline-block;padding:13px 22px;border-radius:7px;background-color:#047857;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold">
+          ${escapeHtml(message.linkLabel || 'Verify your email address')}
+        </a>
+      </p>`
     : '';
-  return `<div style="font-family:Arial,sans-serif;line-height:1.5">${content}${verificationLink}</div>`;
+  return emailLayout(message.title || 'A message from Jimma Islamic Council', `${paragraphs}${verificationLink}`);
 }
 
 function eventRegistrationHtml(message) {
@@ -245,18 +274,16 @@ function eventRegistrationHtml(message) {
     `<tr><td style="padding:8px 12px;color:#57534e">${escapeHtml(label)}</td><td style="padding:8px 12px;font-weight:bold">${escapeHtml(value)}</td></tr>`
   )).join('');
 
-  return `
-    <div style="font-family:Arial,sans-serif;line-height:1.5;color:#292524;max-width:600px;margin:auto">
-      <h2 style="color:#065f46">Your event registration is confirmed</h2>
-      <p>Assalamu Alaykum ${escapeHtml(message.name || 'Guest')},</p>
-      <p>Your place is reserved. Present this QR pass at the event entrance. The PNG pass is attached so you can download it to your phone or print it.</p>
-      <table style="border-collapse:collapse;margin:20px 0;width:100%">${rows}</table>
-      <div style="text-align:center;margin:24px 0">
-        <img src="cid:event-pass-qr" alt="Scannable event pass ${escapeHtml(message.passNumber)}" width="256" height="256" style="width:256px;height:256px">
-        <p style="font-size:12px;color:#57534e">Your pass QR is also attached as a downloadable PNG.</p>
-        <a href="cid:event-pass-qr" download="Event-Pass-${escapeHtml(message.passNumber.replace(/[^A-Za-z0-9_-]/g, '_'))}.png" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#047857;color:#ffffff;text-decoration:none;font-weight:bold">Download QR pass</a>
-      </div>
-      <p style="font-size:12px;color:#78716c">Jimma Islamic Council</p>
+  const content = `
+    <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7">Assalamu Alaykum ${escapeHtml(message.name || 'Guest')},</p>
+    <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7">Your place is reserved. Present this QR pass at the event entrance. The PNG pass is attached so you can download it to your phone or print it.</p>
+    <table role="presentation" style="border-collapse:collapse;margin:20px 0;width:100%;background-color:#f8faf9;border:1px solid #e2e8e4">${rows}</table>
+    <div style="padding:20px;text-align:center;background-color:#f8faf9;border-radius:8px">
+      <img src="cid:event-pass-qr" alt="Scannable event pass ${escapeHtml(message.passNumber)}" width="256" height="256" style="display:block;width:256px;height:256px;margin:0 auto">
+      <p style="margin:12px 0;color:#647067;font-size:13px">Your pass QR is also attached as a downloadable PNG.</p>
+      <a href="cid:event-pass-qr" download="Event-Pass-${escapeHtml(message.passNumber.replace(/[^A-Za-z0-9_-]/g, '_'))}.png" style="display:inline-block;padding:12px 20px;border-radius:7px;background-color:#047857;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold">Download QR pass</a>
     </div>
   `;
+
+  return emailLayout('Your event registration is confirmed', content);
 }

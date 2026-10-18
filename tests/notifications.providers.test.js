@@ -54,6 +54,8 @@ describe('Notification delivery providers', () => {
       subject: 'Notice',
       html: expect.stringContaining('&lt;unsafe&gt;'),
     }));
+    expect(sendMail.mock.calls[0][0].html).toContain('Jimma Islamic Council');
+    expect(sendMail.mock.calls[0][0].html).toContain('background-color:#f4f7f5');
     expect(close).toHaveBeenCalled();
     expect(result).toEqual({ messageId: 'test-message' });
   });
@@ -70,12 +72,15 @@ describe('Notification delivery providers', () => {
 
     await sendEmail('person@example.org', {
       title: 'Verify your email address',
+      linkLabel: 'Confirm my email address',
       verificationUrl: 'https://council.example.org/login?verifyEmail=abc123',
     });
 
-    expect(sendMail.mock.calls[0][0].html).toContain(
-      'href="https://council.example.org/login?verifyEmail=abc123"'
-    );
+    const html = sendMail.mock.calls[0][0].html;
+    expect(html).toContain('href="https://council.example.org/login?verifyEmail=abc123"');
+    expect(html).toMatch(/>\s*Confirm my email address\s*<\/a>/);
+    expect(html.match(/https:\/\/council\.example\.org\/login\?verifyEmail=abc123/g)).toHaveLength(1);
+    expect(html.replace(/<[^>]*>/g, '')).not.toContain('https://council.example.org/login?verifyEmail=abc123');
   });
 
   it('emails event registrants an inline and downloadable QR pass', async () => {
