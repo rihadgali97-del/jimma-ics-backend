@@ -152,10 +152,17 @@ async function sendViaGmailApi(recipient, message, html, text, attachments) {
 
 export async function sendEmail(recipient, message) {
   const isEventRegistration = message.notificationType === 'EVENT_REGISTRATION' && message.passNumber;
+  const eventPassQrContent = isEventRegistration
+    ? [
+        `PASS:${String(message.passNumber).replace(/[\r\n]+/g, ' ').trim()}`,
+        `NAME:${String(message.name || 'Guest').replace(/[\r\n]+/g, ' ').trim()}`,
+        `SEATS:${message.attendeesCount || 1}`,
+      ].join('\n')
+    : null;
   const attachments = isEventRegistration
     ? [{
         filename: `Event-Pass-${message.passNumber.replace(/[^A-Za-z0-9_-]/g, '_')}.png`,
-        content: await QRCode.toBuffer(message.passNumber, {
+        content: await QRCode.toBuffer(eventPassQrContent, {
           type: 'png',
           errorCorrectionLevel: 'H',
           margin: 4,

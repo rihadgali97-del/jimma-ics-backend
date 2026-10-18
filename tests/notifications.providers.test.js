@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import nodemailer from 'nodemailer';
+import QRCode from 'qrcode';
 import { env } from '../src/config/env.js';
 import { dispatch } from '../src/common/services/notifications/dispatch.js';
 import { sendEmail } from '../src/common/services/notifications/providers/email.provider.js';
@@ -92,6 +93,7 @@ describe('Notification delivery providers', () => {
     env.GMAIL_OAUTH2_USER = undefined;
     const sendMail = jest.fn().mockResolvedValue({ messageId: 'event-pass-message' });
     jest.spyOn(nodemailer, 'createTransport').mockReturnValue({ sendMail, close: jest.fn() });
+    const qrToBuffer = jest.spyOn(QRCode, 'toBuffer');
 
     await sendEmail('attendee@example.org', {
       notificationType: 'EVENT_REGISTRATION',
@@ -106,6 +108,9 @@ describe('Notification delivery providers', () => {
     });
 
     const mail = sendMail.mock.calls[0][0];
+    expect(qrToBuffer.mock.calls[0][0]).toBe(
+      'PASS:JIC-PASS-2026-ABC1234567\nNAME:Amina Ahmed\nSEATS:2'
+    );
     expect(mail.html).toContain('cid:event-pass-qr');
     expect(mail.html).toContain('href="cid:event-pass-qr"');
     expect(mail.html).toContain('Download QR pass');
