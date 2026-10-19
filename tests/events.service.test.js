@@ -11,6 +11,7 @@ const mockRepository = {
   findRegistrationsByEmail: jest.fn(),
   findRegistrations: jest.fn(),
   findRegistrationById: jest.fn(),
+  findRegistrationByPassNumber: jest.fn(),
   updateRegistrationStatus: jest.fn(),
   reviewPaymentStatus: jest.fn(),
 };
@@ -35,7 +36,7 @@ jest.unstable_mockModule('../src/modules/events/eventPaymentReceiptStorage.js', 
 }));
 
 const eventsService = await import('../src/modules/events/events.service.js');
-const { createEventSchema, registerForEventSchema } = await import('../src/modules/events/events.validation.js');
+const { createEventSchema, passNumberParamSchema, registerForEventSchema } = await import('../src/modules/events/events.validation.js');
 
 const event = {
   id: 42,
@@ -105,6 +106,57 @@ describe('Events service', () => {
     mockRepository.findById.mockResolvedValue({ ...event, isPublished: false });
 
     await expect(eventsService.getEvent(42)).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('downloads a QR image for a valid, confirmed pass', async () => {
+    mockRepository.findRegistrationByPassNumber.mockResolvedValue({
+      passNumber: 'JIC-PASS-2026-ABC1234567',
+      fullName: 'Amina Ahmed',
+      attendeesCount: 2,
+      status: 'CONFIRMED',
+      paymentStatus: 'FREE',
+    });
+
+    const result = await eventsService.downloadEventPassQr('JIC-PASS-2026-ABC1234567');
+
+    expect(mockRepository.findRegistrationByPassNumber).toHaveBeenCalledWith('JIC-PASS-2026-ABC1234567');
+    expect(result.filename).toBe('Event-Pass-JIC-PASS-2026-ABC1234567.png');
+    expect(result.png.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  });
+
+  it('does not download cancelled or unapproved passes', async () => {
+    mockRepository.findRegistrationByPassNumber.mockResolvedValue({
+      passNumber: 'JIC-PASS-2026-ABC1234567',
+      fullName: 'Amina Ahmed',
+      attendeesCount: 2,
+      status: 'CANCELLED',
+      paymentStatus: 'FREE',
+    });
+
+    await expect(eventsService.downloadEventPassQr('JIC-PASS-2026-ABC1234567'))
+      .rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('allows downloading a paid pass after payment approval', async () => {
+    mockRepository.findRegistrationByPassNumber.mockResolvedValue({
+      passNumber: 'JIC-PASS-2026-ABC1234567',
+      fullName: 'Amina Ahmed',
+      attendeesCount: 2,
+      status: 'CONFIRMED',
+      paymentStatus: 'APPROVED',
+    });
+
+    await expect(eventsService.downloadEventPassQr('JIC-PASS-2026-ABC1234567'))
+      .resolves.toMatchObject({ filename: 'Event-Pass-JIC-PASS-2026-ABC1234567.png' });
+  });
+
+  it('validates downloadable pass numbers', () => {
+    expect(passNumberParamSchema.safeParse({
+      params: { passNumber: 'JIC-PASS-2026-ABC1234567' },
+    }).success).toBe(true);
+    expect(passNumberParamSchema.safeParse({
+      params: { passNumber: '../admin' },
+    }).success).toBe(false);
   });
 
   it('cancels queued reminders after deleting an event', async () => {

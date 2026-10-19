@@ -144,6 +144,19 @@ export const eventsRepository = {
     return prisma.eventRegistration.findUnique({ where: { id }, include: { event: true } });
   },
 
+  findRegistrationByPassNumber(passNumber) {
+    return prisma.eventRegistration.findUnique({
+      where: { passNumber },
+      select: {
+        passNumber: true,
+        fullName: true,
+        attendeesCount: true,
+        status: true,
+        paymentStatus: true,
+      },
+    });
+  },
+
   async updateRegistrationStatus(id, status) {
     return prisma.$transaction(async (tx) => {
       const existing = await tx.eventRegistration.findUnique({ where: { id } });

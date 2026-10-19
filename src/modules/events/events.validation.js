@@ -76,6 +76,11 @@ export const listEventsSchema = z.object({
   }),
 });
 export const eventIdParamSchema = z.object({ params: idParamSchema });
+export const passNumberParamSchema = z.object({
+  params: z.object({
+    passNumber: z.string().regex(/^JIC-PASS-\d{4}-[A-F0-9]{10}$/),
+  }),
+});
 export const createEventSchema = z.object({
   body: z.object(eventFields).refine(
     (data) => !data.isPaid || (data.feeAmount > 0 && Boolean(data.paymentInstructions?.trim())),

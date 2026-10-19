@@ -1,8 +1,8 @@
 services:
   app:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: jimma-ics-backend/Dockerfile
     container_name: jimma_ics_api
     restart: unless-stopped
     ports:
@@ -41,6 +41,8 @@ services:
     image: redis:7-alpine
     container_name: jimma_ics_redis
     restart: unless-stopped
+    ports:
+      - '127.0.0.1:6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:

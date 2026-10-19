@@ -159,18 +159,29 @@ export async function sendEmail(recipient, message) {
         `SEATS:${message.attendeesCount || 1}`,
       ].join('\n')
     : null;
-  const attachments = isEventRegistration
-    ? [{
-        filename: `Event-Pass-${message.passNumber.replace(/[^A-Za-z0-9_-]/g, '_')}.png`,
-        content: await QRCode.toBuffer(eventPassQrContent, {
+  const passFilename = isEventRegistration
+    ? `Event-Pass-${message.passNumber.replace(/[^A-Za-z0-9_-]/g, '_')}.png`
+    : null;
+  const passImage = isEventRegistration
+    ? await QRCode.toBuffer(eventPassQrContent, {
           type: 'png',
           errorCorrectionLevel: 'H',
           margin: 4,
           width: 512,
-        }),
+        })
+    : null;
+  const attachments = isEventRegistration
+    ? [{
+        filename: passFilename,
+        content: passImage,
         contentType: 'image/png',
         cid: 'event-pass-qr',
         contentDisposition: 'inline',
+      }, {
+        filename: passFilename,
+        content: passImage,
+        contentType: 'image/png',
+        contentDisposition: 'attachment',
       }]
     : [];
   const html = message.html || (isEventRegistration ? eventRegistrationHtml(message) : notificationHtml(message));
@@ -212,6 +223,7 @@ function notificationText(message) {
     message.passNumber && `Pass number: ${message.passNumber}`,
     message.attendeesCount && `Seats reserved: ${message.attendeesCount}`,
     message.notificationType === 'EVENT_REGISTRATION' && 'Your downloadable QR pass is attached as a PNG image.',
+    message.passDownloadUrl && `Download your QR pass: ${message.passDownloadUrl}`,
     message.verificationUrl && `${message.linkLabel || 'Verify your email'}: ${message.verificationUrl}`,
   ].filter(Boolean).join('\n\n');
 }
@@ -280,16 +292,23 @@ function eventRegistrationHtml(message) {
   const rows = details.map(([label, value]) => (
     `<tr><td style="padding:8px 12px;color:#57534e">${escapeHtml(label)}</td><td style="padding:8px 12px;font-weight:bold">${escapeHtml(value)}</td></tr>`
   )).join('');
+  const downloadButton = message.passDownloadUrl
+    ? `<p style="margin:24px 0 0;text-align:center">
+        <a href="${escapeHtml(message.passDownloadUrl)}" style="display:inline-block;padding:13px 22px;border-radius:7px;background-color:#047857;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold">
+          Download your QR pass
+        </a>
+      </p>`
+    : '';
 
   const content = `
     <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7">Assalamu Alaykum ${escapeHtml(message.name || 'Guest')},</p>
-    <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7">Your place is reserved. Present this QR pass at the event entrance. The PNG pass is attached so you can download it to your phone or print it.</p>
+    <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7">Your place is reserved. Present this QR pass at the event entrance. Download it using the button below, or save the attached PNG to your phone or print it.</p>
     <table role="presentation" style="border-collapse:collapse;margin:20px 0;width:100%;background-color:#f8faf9;border:1px solid #e2e8e4">${rows}</table>
     <div style="padding:20px;text-align:center;background-color:#f8faf9;border-radius:8px">
       <img src="cid:event-pass-qr" alt="Scannable event pass ${escapeHtml(message.passNumber)}" width="256" height="256" style="display:block;width:256px;height:256px;margin:0 auto">
-      <p style="margin:12px 0;color:#647067;font-size:13px">Your pass QR is also attached as a downloadable PNG.</p>
-      <a href="cid:event-pass-qr" download="Event-Pass-${escapeHtml(message.passNumber.replace(/[^A-Za-z0-9_-]/g, '_'))}.png" style="display:inline-block;padding:12px 20px;border-radius:7px;background-color:#047857;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold">Download QR pass</a>
+      <p style="margin:12px 0;color:#647067;font-size:13px">You can also save the attached PNG to your device or print it.</p>
     </div>
+    ${downloadButton}
   `;
 
   return emailLayout('Your event registration is confirmed', content);

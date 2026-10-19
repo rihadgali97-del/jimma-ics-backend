@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import QRCode from 'qrcode';
 import { eventsRepository } from './events.repository.js';
 import { BadRequestError, ConflictError, NotFoundError } from '../../common/errors/httpErrors.js';
 import { writeAuditLog } from '../../common/utils/auditLog.js';
@@ -242,6 +243,34 @@ export async function findMyEventRegistrations({ email, phone }) {
       return true;
     })
     .map(toEventRegistration);
+}
+
+export async function downloadEventPassQr(passNumber) {
+  const registration = await eventsRepository.findRegistrationByPassNumber(passNumber);
+  if (
+    !registration ||
+    registration.status === 'CANCELLED' ||
+    !['FREE', 'APPROVED'].includes(registration.paymentStatus)
+  ) {
+    throw new NotFoundError('Event pass not found');
+  }
+
+  const content = [
+    `PASS:${registration.passNumber}`,
+    `NAME:${registration.fullName.replace(/[\r\n]+/g, ' ').trim()}`,
+    `SEATS:${registration.attendeesCount}`,
+  ].join('\n');
+  const png = await QRCode.toBuffer(content, {
+    type: 'png',
+    errorCorrectionLevel: 'H',
+    margin: 4,
+    width: 512,
+  });
+
+  return {
+    filename: `Event-Pass-${registration.passNumber.replace(/[^A-Za-z0-9_-]/g, '_')}.png`,
+    png,
+  };
 }
 
 export async function listEventRegistrations(query) {

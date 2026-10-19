@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
+import { URL } from 'node:url';
 import { env } from '../../config/env.js';
 import { ConflictError, NotFoundError } from '../../common/errors/httpErrors.js';
 import { buildPaginationMeta, parsePagination } from '../../common/utils/pagination.js';
@@ -495,7 +496,9 @@ export async function queueAnnouncementNotifications(announcement) {
 }
 
 export async function queueRegistrationConfirmation(registration) {
-  if (!registration.email) return 0;
+  if (!registration.email || !registration.passNumber) return 0;
+  const passDownloadUrl = new URL('/events', env.WEB_APP_URL);
+  passDownloadUrl.searchParams.set('downloadPass', registration.passNumber);
   return notificationsRepository.enqueueMany([{
     channel: 'EMAIL',
     notificationType: 'EVENT_REGISTRATION',
@@ -511,6 +514,7 @@ export async function queueRegistrationConfirmation(registration) {
       eventTime: registration.event.time,
       eventLocation: registration.event.location,
       passNumber: registration.passNumber,
+      passDownloadUrl: passDownloadUrl.toString(),
       attendeesCount: registration.attendeesCount,
     },
     status: 'QUEUED',

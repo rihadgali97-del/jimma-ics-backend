@@ -6,6 +6,7 @@ import {
   findMyEventRegistrationsSchema,
   listEventRegistrationsSchema,
   listEventsSchema,
+  passNumberParamSchema,
   registerForEventSchema,
   reviewEventPaymentSchema,
   updateEventSchema,
@@ -21,6 +22,12 @@ export const eventsPublicRouter = Router();
 export const eventsAdminRouter = Router();
 
 eventsPublicRouter.get('/', validate(listEventsSchema), eventsController.listPublic);
+eventsPublicRouter.get(
+  '/passes/:passNumber/download',
+  strictRateLimiter({ windowMs: 15 * 60 * 1000, max: 30 }),
+  validate(passNumberParamSchema),
+  eventsController.downloadEventPassQr
+);
 eventsPublicRouter.get('/:id', validate(eventIdParamSchema), eventsController.getPublic);
 eventsPublicRouter.post(
   '/registrations/lookup',

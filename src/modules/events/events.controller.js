@@ -19,6 +19,14 @@ export const findMyRegistrations = asyncHandler(async (req, res) => {
   sendSuccess(res, { data: await eventsService.findMyEventRegistrations(req.body) });
 });
 
+export const downloadEventPassQr = asyncHandler(async (req, res) => {
+  const { filename, png } = await eventsService.downloadEventPassQr(req.params.passNumber);
+  res.type('png');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.send(png);
+});
+
 export const listAdmin = asyncHandler(async (req, res) => {
   const result = await eventsService.listEvents(req.query, { publicOnly: false });
   sendSuccess(res, { data: result.items, meta: result.meta });

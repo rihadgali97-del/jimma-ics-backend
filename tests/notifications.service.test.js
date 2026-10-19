@@ -483,6 +483,7 @@ describe('Notification outbox triggers', () => {
           name: 'Amina Ahmed',
           eventTitle: 'Community Lecture',
           passNumber: 'JIC-PASS-2026-ABC1234567',
+          passDownloadUrl: 'http://localhost:3000/events?downloadPass=JIC-PASS-2026-ABC1234567',
           attendeesCount: 2,
         }),
       }),

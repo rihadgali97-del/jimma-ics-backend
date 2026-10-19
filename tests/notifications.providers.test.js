@@ -104,6 +104,7 @@ describe('Notification delivery providers', () => {
       eventTime: '09:00',
       eventLocation: 'Jimma Mosque',
       passNumber: 'JIC-PASS-2026-ABC1234567',
+      passDownloadUrl: 'https://council.example.org/events?downloadPass=JIC-PASS-2026-ABC1234567',
       attendeesCount: 2,
     });
 
@@ -112,17 +113,26 @@ describe('Notification delivery providers', () => {
       'PASS:JIC-PASS-2026-ABC1234567\nNAME:Amina Ahmed\nSEATS:2'
     );
     expect(mail.html).toContain('cid:event-pass-qr');
-    expect(mail.html).toContain('href="cid:event-pass-qr"');
-    expect(mail.html).toContain('Download QR pass');
+    expect(mail.html).not.toContain('href="cid:event-pass-qr"');
+    expect(mail.html).toContain('href="https://council.example.org/events?downloadPass=JIC-PASS-2026-ABC1234567"');
+    expect(mail.html).toMatch(/>\s*Download your QR pass\s*<\/a>/);
+    expect(mail.html).toContain('save the attached PNG');
     expect(mail.html).toContain('Community Lecture');
     expect(mail.text).toContain('downloadable QR pass is attached as a PNG');
-    expect(mail.attachments).toHaveLength(1);
+    expect(mail.text).toContain('Download your QR pass: https://council.example.org/events?downloadPass=JIC-PASS-2026-ABC1234567');
+    expect(mail.attachments).toHaveLength(2);
     expect(mail.attachments[0]).toMatchObject({
       filename: 'Event-Pass-JIC-PASS-2026-ABC1234567.png',
       contentType: 'image/png',
       cid: 'event-pass-qr',
       contentDisposition: 'inline',
     });
+    expect(mail.attachments[1]).toMatchObject({
+      filename: 'Event-Pass-JIC-PASS-2026-ABC1234567.png',
+      contentType: 'image/png',
+      contentDisposition: 'attachment',
+    });
+    expect(mail.attachments[1].content).toEqual(mail.attachments[0].content);
     expect(mail.attachments[0].content.subarray(0, 8)).toEqual(
       Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
     );
@@ -161,6 +171,41 @@ describe('Notification delivery providers', () => {
     expect(rawMessage).toContain('To: person@example.org');
     expect(rawMessage).toContain(Buffer.from('OAuth message').toString('base64'));
     expect(result).toEqual({ messageId: 'gmail-api-message' });
+  });
+
+  it('includes a downloadable QR attachment in Gmail API registration emails', async () => {
+    env.GMAIL_SMTP_USER = 'sender@gmail.com';
+    env.GMAIL_CLIENT_ID = 'client-id';
+    env.GMAIL_CLIENT_SECRET = 'client-secret';
+    env.GMAIL_REFRESH_TOKEN = 'refresh-token';
+    env.GMAIL_OAUTH2_USER = 'sender@gmail.com';
+    jest.spyOn(QRCode, 'toBuffer').mockResolvedValue(Buffer.from('qr-png-content'));
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'short-lived-access-token' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'gmail-api-event-pass' }),
+      });
+
+    await sendEmail('attendee@example.org', {
+      notificationType: 'EVENT_REGISTRATION',
+      eventTitle: 'Community Lecture',
+      name: 'Amina Ahmed',
+      passNumber: 'JIC-PASS-2026-ABC1234567',
+      attendeesCount: 2,
+    });
+
+    const request = JSON.parse(global.fetch.mock.calls[1][1].body);
+    const rawMessage = Buffer.from(request.raw, 'base64url').toString();
+    expect(rawMessage).toContain('Content-ID: <event-pass-qr>');
+    expect(rawMessage).toContain('Content-Disposition: attachment; filename="Event-Pass-JIC-PASS-2026-ABC1234567.png"');
+    expect(rawMessage).toContain(Buffer.from('qr-png-content').toString('base64'));
+    expect(rawMessage).not.toContain('href="cid:event-pass-qr"');
   });
 
   it('sends Telegram messages to the configured information channel', async () => {
