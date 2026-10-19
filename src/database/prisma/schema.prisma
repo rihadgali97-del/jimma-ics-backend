@@ -676,6 +676,9 @@ model NisabRate {
   id                 Int      @id @default(autoincrement())
   goldPricePerGram   Float    @map("gold_price_per_gram")
   silverPricePerGram Float    @map("silver_price_per_gram")
+  cropRates          Json?    @map("crop_rates")
+  sheepGoatPricePerHeadETB Float @default(6500) @map("sheep_goat_price_per_head_etb")
+  cattlePricePerHeadETB    Float @default(26000) @map("cattle_price_per_head_etb")
   effectiveDate      DateTime @map("effective_date")
   createdAt          DateTime @default(now()) @map("created_at")
 

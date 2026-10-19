@@ -168,14 +168,28 @@ export async function getCurrentNisabRate() {
   return {
     goldPricePerGram: rate.goldPricePerGram,
     silverPricePerGram: rate.silverPricePerGram,
+    cropRates: rate.cropRates || [],
+    sheepGoatPricePerHeadETB: rate.sheepGoatPricePerHeadETB ?? 6500,
+    cattlePricePerHeadETB: rate.cattlePricePerHeadETB ?? 26000,
     effectiveDate: rate.effectiveDate,
   };
 }
 
-export async function setNisabRate({ goldPricePerGram, silverPricePerGram, effectiveDate }, actorId) {
+export async function setNisabRate({
+  goldPricePerGram,
+  silverPricePerGram,
+  cropRates,
+  sheepGoatPricePerHeadETB,
+  cattlePricePerHeadETB,
+  effectiveDate,
+}, actorId) {
+  const current = await zakatRepository.findCurrentNisabRate();
   const rate = await zakatRepository.createNisabRate({
     goldPricePerGram,
     silverPricePerGram,
+    cropRates: cropRates ?? current?.cropRates ?? [],
+    sheepGoatPricePerHeadETB: sheepGoatPricePerHeadETB ?? current?.sheepGoatPricePerHeadETB ?? 6500,
+    cattlePricePerHeadETB: cattlePricePerHeadETB ?? current?.cattlePricePerHeadETB ?? 26000,
     effectiveDate: effectiveDate ?? new Date(),
   });
 
@@ -184,12 +198,21 @@ export async function setNisabRate({ goldPricePerGram, silverPricePerGram, effec
     action: 'update',
     entityType: 'nisab_rate',
     entityId: rate.id,
-    after: { goldPricePerGram, silverPricePerGram },
+    after: {
+      goldPricePerGram,
+      silverPricePerGram,
+      cropRates: rate.cropRates,
+      sheepGoatPricePerHeadETB: rate.sheepGoatPricePerHeadETB,
+      cattlePricePerHeadETB: rate.cattlePricePerHeadETB,
+    },
   });
 
   return {
     goldPricePerGram: rate.goldPricePerGram,
     silverPricePerGram: rate.silverPricePerGram,
+    cropRates: rate.cropRates || [],
+    sheepGoatPricePerHeadETB: rate.sheepGoatPricePerHeadETB,
+    cattlePricePerHeadETB: rate.cattlePricePerHeadETB,
     effectiveDate: rate.effectiveDate,
   };
 }

@@ -5,6 +5,7 @@ const mockRepository = {
   create: jest.fn(),
   findByReference: jest.fn(),
   findCurrentNisabRate: jest.fn(),
+  createNisabRate: jest.fn(),
   deleteAssessment: jest.fn(),
 };
 const mockWriteAuditLog = jest.fn();
@@ -131,14 +132,65 @@ describe('Nisab rate service', () => {
     mockRepository.findCurrentNisabRate.mockResolvedValue({
       goldPricePerGram: 12500,
       silverPricePerGram: 160,
+      cropRates: [{ name: 'Teff', nisabQuintals: 7, pricePerQuintalETB: 4200 }],
+      sheepGoatPricePerHeadETB: 7200,
+      cattlePricePerHeadETB: 31000,
       effectiveDate,
     });
 
     await expect(zakatService.getCurrentNisabRate()).resolves.toEqual({
       goldPricePerGram: 12500,
       silverPricePerGram: 160,
+      cropRates: [{ name: 'Teff', nisabQuintals: 7, pricePerQuintalETB: 4200 }],
+      sheepGoatPricePerHeadETB: 7200,
+      cattlePricePerHeadETB: 31000,
       effectiveDate,
     });
+  });
+
+  it('keeps existing crop and livestock references when publishing only gold and silver prices', async () => {
+    const existing = {
+      cropRates: [{ name: 'Coffee', nisabQuintals: 7, pricePerQuintalETB: 5000 }],
+      sheepGoatPricePerHeadETB: 7000,
+      cattlePricePerHeadETB: 32000,
+    };
+    mockRepository.findCurrentNisabRate.mockResolvedValue(existing);
+    mockRepository.createNisabRate.mockImplementation(async (rate) => ({ id: 2, ...rate }));
+
+    await zakatService.setNisabRate({
+      goldPricePerGram: 13000,
+      silverPricePerGram: 180,
+    }, 5);
+
+    expect(mockRepository.createNisabRate).toHaveBeenCalledWith(expect.objectContaining(existing));
+    expect(mockWriteAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      after: expect.objectContaining(existing),
+    }));
+  });
+
+  it('stores newly published crop and per-head livestock reference values', async () => {
+    mockRepository.findCurrentNisabRate.mockResolvedValue(null);
+    mockRepository.createNisabRate.mockImplementation(async (rate) => ({ id: 2, ...rate }));
+
+    const cropRates = [{ name: 'Teff', nisabQuintals: 8, pricePerQuintalETB: 4000 }];
+    const result = await zakatService.setNisabRate({
+      goldPricePerGram: 13000,
+      silverPricePerGram: 180,
+      cropRates,
+      sheepGoatPricePerHeadETB: 8000,
+      cattlePricePerHeadETB: 40000,
+    }, 5);
+
+    expect(mockRepository.createNisabRate).toHaveBeenCalledWith(expect.objectContaining({
+      cropRates,
+      sheepGoatPricePerHeadETB: 8000,
+      cattlePricePerHeadETB: 40000,
+    }));
+    expect(result).toEqual(expect.objectContaining({
+      cropRates,
+      sheepGoatPricePerHeadETB: 8000,
+      cattlePricePerHeadETB: 40000,
+    }));
   });
 });
 

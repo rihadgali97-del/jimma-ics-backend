@@ -221,6 +221,17 @@ zakatAdminRouter.patch(
  *             properties:
  *               goldPricePerGram: { type: number }
  *               silverPricePerGram: { type: number }
+ *               cropRates:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [name, nisabQuintals, pricePerQuintalETB]
+ *                   properties:
+ *                     name: { type: string }
+ *                     nisabQuintals: { type: number }
+ *                     pricePerQuintalETB: { type: number }
+ *               sheepGoatPricePerHeadETB: { type: number }
+ *               cattlePricePerHeadETB: { type: number }
  *               effectiveDate: { type: string, format: date-time }
  *     responses:
  *       201: { description: New rate recorded }

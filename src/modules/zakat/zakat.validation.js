@@ -63,7 +63,28 @@ export const setNisabRateSchema = z.object({
   body: z.object({
     goldPricePerGram: z.coerce.number().positive(),
     silverPricePerGram: z.coerce.number().positive(),
+    cropRates: z.array(z.object({
+      name: z.string().trim().min(1).max(100),
+      nisabQuintals: z.coerce.number().positive(),
+      pricePerQuintalETB: z.coerce.number().nonnegative(),
+    })).min(1).max(100).optional(),
+    sheepGoatPricePerHeadETB: z.coerce.number().positive().optional(),
+    cattlePricePerHeadETB: z.coerce.number().positive().optional(),
     effectiveDate: z.coerce.date().optional(), // defaults to now in the service
+  }).superRefine((data, context) => {
+    if (!data.cropRates) return;
+    const names = new Set();
+    data.cropRates.forEach((crop, index) => {
+      const normalizedName = crop.name.toLowerCase();
+      if (names.has(normalizedName)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['cropRates', index, 'name'],
+          message: 'Crop names must be unique',
+        });
+      }
+      names.add(normalizedName);
+    });
   }),
 });
 
